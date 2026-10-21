@@ -298,6 +298,31 @@ describe("the hooks", () => {
     assert.equal(turnText(transcript), "Part one.\n\nPart two.");
   });
 
+  it("starts a turn at a message from another agent or from a Stop hook, and not at a skill's text", () => {
+    const peer = { isMeta: true, origin: { kind: "peer" }, turnOrigin: "peer", turnPosition: { turnIndex: 2 } };
+    const fromPeer = [
+      entry("user", "question"),
+      entry("assistant", [{ type: "text", text: "Old answer." }]),
+      entry("user", "Another Claude session sent a message: done.", peer),
+      entry("assistant", [{ type: "text", text: "New answer." }]),
+    ].join("\n");
+    assert.equal(turnText(fromPeer), "New answer.");
+    const afterFeedback = [
+      entry("user", "question"),
+      entry("assistant", [{ type: "text", text: "First draft." }]),
+      entry("user", "Stop hook feedback:\nWrite the reply again.", { isMeta: true }),
+      entry("assistant", [{ type: "text", text: "Second draft." }]),
+    ].join("\n");
+    assert.equal(turnText(afterFeedback), "Second draft.");
+    const skill = [
+      entry("user", "question"),
+      entry("assistant", [{ type: "text", text: "Part one." }]),
+      entry("user", "Base directory for this skill: /skills/x", { isMeta: true, turnCompanion: true }),
+      entry("assistant", [{ type: "text", text: "Part two." }]),
+    ].join("\n");
+    assert.equal(turnText(skill), "Part one.\n\nPart two.");
+  });
+
   function runHook(name, event) {
     return spawnSync("node", [path.join(SKILL, "hooks", name)], { input: JSON.stringify(event), encoding: "utf8" });
   }

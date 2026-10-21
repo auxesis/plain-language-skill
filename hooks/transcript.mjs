@@ -18,16 +18,27 @@ export function tail(file) {
   }
 }
 
-// A message the person typed: a user entry with text in it. Tool results and text the
-// harness adds (isMeta) are user entries too, and do not start a turn.
-function isPersonMessage(entry) {
-  if (entry?.type !== "user" || entry.isMeta || entry.isSidechain) return false;
+// A user entry with text in it starts a turn. Tool results are user entries too, and do
+// not start one. Text the harness adds is marked isMeta, and most of it, such as a
+// skill's text, arrives in the middle of a turn. Two kinds of it start a turn: a
+// message from another agent, which has turnOrigin and origin, and Stop hook feedback.
+// Checked against transcripts from Claude Code 2.1.306 on 22 October 2026.
+function startsTurn(entry) {
+  if (entry?.type !== "user" || entry.isSidechain) return false;
   const content = entry.message?.content;
-  if (typeof content === "string") return true;
-  return Array.isArray(content) && content.some((block) => block?.type === "text");
+  const text =
+    typeof content === "string"
+      ? content
+      : Array.isArray(content)
+        ? content.find((block) => block?.type === "text")?.text
+        : undefined;
+  if (typeof text !== "string") return false;
+  if (!entry.isMeta) return true;
+  if (entry.turnCompanion || entry.sourceToolUseID) return false;
+  return Boolean(entry.turnOrigin || entry.origin) || text.startsWith("Stop hook feedback:");
 }
 
-// Every text block Claude wrote since the person's last message, in order.
+// Every text block Claude wrote since the turn started, in order.
 export function turnText(transcript) {
   const lines = transcript.split("\n").filter(Boolean);
   const parts = [];
@@ -38,7 +49,7 @@ export function turnText(transcript) {
     } catch {
       continue;
     }
-    if (isPersonMessage(entry)) break;
+    if (startsTurn(entry)) break;
     if (entry?.type !== "assistant" || entry.isSidechain) continue;
     const content = entry.message?.content;
     if (!Array.isArray(content)) continue;
