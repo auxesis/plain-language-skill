@@ -160,7 +160,7 @@ const OPENING_CLAUSE = /^\s*(?:If|When|Whenever|Unless|Once|Because|Although|Tho
 const LIST_END = /([\p{L}\p{N}][\p{L}\p{N}'’-]*(?:\s[\p{L}\p{N}'’-]+){0,3}),\s([\p{L}\p{N}][\p{L}\p{N}'’-]*(?:\s[\p{L}\p{N}'’-]+){0,3})\s(and|or)\s[\p{L}\p{N}]/gu;
 const CLAUSE_WORDS = /\b(?:I|you|we|they|it|he|she|is|are|was|were|has|have|had|will|can|cannot|do|does|did|must|should|would|could)\b/;
 // A phrase after the comma, not a list item: "with your reason and the date", "such as Lift and Shift".
-const NOT_AN_ITEM = /^(?:with|without|by|for|from|in|on|at|to|into|onto|of|as|then|so|but|which|who|whom|where|when|while|such|including|like|especially|plus|except|both|either|neither|each|every|not|only|also|even)\b|^[\p{L}]+(?:ed|ing)\b/iu;
+const NOT_AN_ITEM = /^(?:and|or|nor|with|without|by|for|from|in|on|at|to|into|onto|of|as|then|so|but|which|who|whom|where|when|while|such|including|like|especially|plus|except|both|either|neither|each|every|not|only|also|even)\b|^[\p{L}]+(?:ed|ing)\b/iu;
 
 function commaFindings(piece, sentence, masked) {
   const found = [];

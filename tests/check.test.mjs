@@ -223,6 +223,7 @@ describe("rules from the user's review of round two", () => {
     assert.deepEqual(blocking("It covers words, headings, and links.", "chat"), []);
     assert.deepEqual(blocking("An assessment can have a level, such as Lift and Shift Level 2.", "chat"), []);
     assert.deepEqual(blocking("Your row shows it as Paused, with your reason and the date.", "chat"), []);
+    assert.deepEqual(blocking("Comment on a line, or select lines and suggest a change.", "chat"), []);
   });
 });
 
