@@ -224,6 +224,9 @@ describe("rules from the user's review of round two", () => {
     assert.deepEqual(blocking("An assessment can have a level, such as Lift and Shift Level 2.", "chat"), []);
     assert.deepEqual(blocking("Your row shows it as Paused, with your reason and the date.", "chat"), []);
     assert.deepEqual(blocking("Comment on a line, or select lines and suggest a change.", "chat"), []);
+    assert.deepEqual(blocking("Eight test inputs, run before and after the change.", "chat"), []);
+    assert.deepEqual(blocking("I checked the page, before and after the change.", "chat"), []);
+    assert.ok(!blocking("The report, written last week and sent today, lists the results.", "chat").includes("serial-comma"));
   });
 });
 
