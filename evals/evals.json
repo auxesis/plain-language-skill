@@ -1,0 +1,65 @@
+{
+  "skill_name": "plain-language",
+  "evals": [
+    {
+      "id": 1,
+      "name": "chat-isolation-level",
+      "prompt": "We have a jobs table in Postgres and 4 worker processes that grab work with `SELECT ... FOR UPDATE SKIP LOCKED`. A colleague says we should switch the whole thing to SERIALIZABLE isolation to stop two workers ever picking the same job. Is that right? What would you do?",
+      "expected_output": "A chat reply that answers first (no, SKIP LOCKED already prevents double pickup under READ COMMITTED), explains why in plain, literal words for a technical reader, and says what to do instead.",
+      "files": [],
+      "assertions": [
+        "The plain-language checker finds nothing that must be fixed in any output file",
+        "No wordy phrase, cliché, idiom, symbol shorthand or stacked hedge from the checker's word lists",
+        "Average sentence length is 18 words or fewer",
+        "The first sentence answers the question: SERIALIZABLE is not needed to stop two workers taking the same job",
+        "The explanation is technically correct: FOR UPDATE locks the row, and SKIP LOCKED makes other workers skip locked rows, under the default READ COMMITTED level",
+        "It names the real cost of SERIALIZABLE in plain words: transactions fail with serialization errors and must be retried",
+        "It gives a concrete recommendation for what to do instead",
+        "It uses no metaphor, idiom or invented label, and every technical term is one this reader already uses or is explained",
+        "It says what its claims rest on, or how sure it is, without stacking hedges"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "incident-writeup-two-audiences",
+      "prompt": "Can you turn my notes from last night's incident into a write-up I can post in our team channel? It needs to work for the devs and also for Priya, our volunteer ops coordinator, who isn't technical. Save it as incident-2026-10-14.md. My notes are in incident-notes.txt.",
+      "expected_output": "A Markdown write-up that leads with what happened and the effect, serves both audiences (labelled parts or a plain summary first), separates confirmed facts from suspicions, ties uncertainty to evidence, and ends with next steps and owners/dates.",
+      "files": [
+        "evals/files/incident-notes.txt"
+      ],
+      "assertions": [
+        "The plain-language checker finds nothing that must be fixed in any output file",
+        "No wordy phrase, cliché, idiom, symbol shorthand or stacked hedge from the checker's word lists",
+        "Average sentence length is 18 words or fewer",
+        "The opening says what happened to members and the effect, in words a non-technical reader understands",
+        "A part is written for, or clearly labelled for, the non-technical reader, separate from the technical detail",
+        "What is confirmed is kept apart from what is not yet known; which component retried the run is marked as unconfirmed",
+        "The member who may have received 3 emails is reported as unconfirmed, not as fact",
+        "Key numbers match the notes: 683 sent against 341 expected, 7 replies, 1 unsubscribe, a 70 to 90 second run against a 120 second limit, 341 members against 290",
+        "Open actions are listed, including switching sending back on before Friday 7 pm and fixing the member who unsubscribed",
+        "The part for the non-technical reader leaves out or explains terms such as edge function, pg_cron, ON CONFLICT and idempotency",
+        "Dates and times are unambiguous: the day and month are written out and the time zone is stated"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "rewrite-dense-claude-md",
+      "prompt": "This section of our CLAUDE.md is really hard to follow. Rewrite it so someone new to the repo understands what goes wrong, why, and what they must not change. Keep every fact. Save it as rewritten.md. The section is in claude-md-sms-section.md.",
+      "expected_output": "A rewrite that keeps every fact from the original, leads with the rule a contributor must follow, separates what was measured from what is unknown, and uses short literal sentences.",
+      "files": [
+        "evals/files/claude-md-sms-section.md"
+      ],
+      "assertions": [
+        "The plain-language checker finds nothing that must be fixed in any output file",
+        "No wordy phrase, cliché, idiom, symbol shorthand or stacked hedge from the checker's word lists",
+        "Average sentence length is 18 words or fewer",
+        "The opening tells a new contributor what they must not change: the enabled [auth.sms.messagebird] block in slipstream/supabase/config.toml",
+        "All 14 facts of the original are present (see the fact list in the grader instructions)",
+        "It keeps the uncertainty: the platform rule was never established, two explanations fit, and neither may be stated as fact",
+        "Measured facts are kept apart from unknowns",
+        "Terms a newcomer may not know, such as apply, provider block and the send_sms hook, are explained or avoided",
+        "Nothing is added that the original does not say"
+      ]
+    }
+  ]
+}

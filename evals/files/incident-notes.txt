@@ -1,0 +1,14 @@
+notes - reminder dupes - weds 14/10
+
+- 19:02 AEDT nightly reminder run kicked off (cron, edge fn `reminders`)
+- 19:04 second invocation?? logs show 2x "run started" w/ diff request ids (req_8f2a, req_c91d) ~110s apart
+- resend dashboard: 683 emails sent vs expected 341. so basically every member got 2. (341*2=682, +1 = one member in 2 units got 3?? need to check)
+- reminder_sends ledger has 341 rows only — 2nd run inserted 0 rows?? but still sent. ON CONFLICT DO NOTHING on (member_email, item, day) -> insert noop'd but send happened before insert. ordering bug: send THEN record
+- why 2 runs: supabase cron retried? pg_cron job_run_details shows status=failed for first at 19:03:58 "statement timeout" — but the fn actually kept going (edge fn doesn't die when the caller times out). so cron saw failure, retried, both ran
+- statement_timeout on cron = 120s (default?). run normally takes 70-90s. this week 341 members vs 290 last wk (gosford + wyong merged into one roster sat 10/10) -> took longer -> crossed 120s
+- not 100% sure retry is pg_cron (pg_cron doesn't retry by default afaik??) — might be our own wrapper `run_reminders_with_retry()` from #612. CHECK
+- 7 members replied asking why 2 emails. 1 unsubscribed (complaint -> reminder_opt_outs row, source=complaint). that one needs manual fix? they didn't mean to opt out maybe
+- impact: annoyance only, no wrong info in emails (both copies identical, checked 5 at random)
+- fix ideas: (a) record before send (insert ledger row, then send, mark sent) (b) raise timeout to 300s (c) idempotency key on resend API = run_id+member (d) advisory lock so 2nd run exits
+- mitigation done: paused cron for thurs (sending control off) — need to turn back on before fri 7pm
+- TODO: confirm which thing retried. look at #612 wrapper
