@@ -1,7 +1,8 @@
 # Plain language skill for Claude Code
 
-This skill makes Claude Code write in plain language.
+This Claude Code plugin makes Claude write in plain language.
 It follows ISO 24495-1:2023, ISO 24495-3:2026, and the GOV.UK content guidance.
+The plugin contains a skill and five hooks.
 
 ## Example
 
@@ -23,23 +24,16 @@ With the skill, Claude replies:
 - **Every message you send:** a hook adds a one-line reminder of those rules.
 - **Every chat reply:** a Stop hook checks the reply. If a rule that must be fixed is broken, the reply goes back to Claude once for a rewrite.
 - **Every Markdown or text file Claude writes:** a hook checks the new text in the same way.
-- **Documents, rewrites, and reviews:** Claude loads `SKILL.md`. It has the full process.
+- **Documents, rewrites, and reviews:** Claude loads the skill in `SKILL.md`. It has the full process.
 
 ## Install
 
 You need Claude Code, git, and Python 3.9 or later.
 The hooks and the checker are written in Python.
 They use only the modules that come with Python, so you do not need to install any packages.
-The skill has been tested on Linux only, with Claude Code 2.1.306, Python 3.9.25, and Python 3.14.4.
+The plugin has been tested on Linux only, with Claude Code 2.1.307, Python 3.9.25, and Python 3.14.8.
 
-1. Clone this repository into your Claude Code skills folder.
-   The folder must be named `plain-language`, because the hooks use that path.
-
-   ```
-   git clone https://github.com/auxesis/plain-language-skill.git ~/.claude/skills/plain-language
-   ```
-
-2. Check that you have Python 3.9 or later:
+1. Check that you have Python 3.9 or later:
 
    ```
    python3 --version
@@ -50,97 +44,145 @@ The skill has been tested on Linux only, with Claude Code 2.1.306, Python 3.9.25
    If you do not have them, macOS offers to install them when you run `python3`.
    If you have no Python 3, or a version older than 3.9, install Python from [python.org](https://www.python.org/downloads/) or with your package manager.
 
-3. Add the hooks to `~/.claude/settings.json`.
-   If the file has no `hooks` key, add the `hooks` key below to the top level of the file.
-   If the file already has a `hooks` key, add each entry below to the list for its event.
-   Do not replace the hooks you already have.
+   The hooks run `python3` in the folder of the project you have open.
+   A tool such as mise or pyenv can give a project folder its own version of Python.
+   If you use one, run `python3 --version` in your project folder as well.
 
-   ```json
-   {
-     "hooks": {
-       "SessionStart": [
-         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/session-start.py\" || exit 1" }] }
-       ],
-       "SubagentStart": [
-         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/session-start.py\" || exit 1" }] }
-       ],
-       "UserPromptSubmit": [
-         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/prompt-reminder.py\" || exit 1" }] }
-       ],
-       "Stop": [
-         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/stop-guard.py\" || exit 1" }] }
-       ],
-       "PostToolUse": [
-         { "matcher": "Write|Edit|MultiEdit", "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/file-guard.py\" || exit 1" }] }
-       ]
-     }
-   }
+2. Add the marketplace that lists the plugin:
+
+   ```
+   claude plugin marketplace add auxesis/plain-language-skill
    ```
 
-   If Python 3 is not installed, each hook exits without doing anything.
-   The hooks run in the folder of the project you have open.
-   The `-I` option stops that project from changing what the hooks run.
-   With it, Python does not load code from the project folder.
-   It also ignores packages installed in your home folder, and any environment variable whose name starts with `PYTHON`.
+   The marketplace is named `plain-language-skill`.
 
-   Each command ends with `|| exit 1`.
-   If a hook's file is missing, Python exits with code 2.
-   Claude Code treats exit code 2 as an instruction to block, so the prompt hook would block every message you send.
-   `|| exit 1` changes the code to 1, so Claude Code reports an error and does not block anything.
+3. Install the plugin:
+
+   ```
+   claude plugin install plain-language@plain-language-skill
+   ```
+
+   In a Claude Code session, the same steps are `/plugin marketplace add auxesis/plain-language-skill` and `/plugin install plain-language@plain-language-skill`.
 
 4. Turn off any plugin or setting that tells Claude to write in a terse style, such as the caveman plugin.
-   Its instructions conflict with the rules in this skill.
+   Its instructions conflict with the rules in this plugin.
 
 5. Start a new Claude Code session.
-   Claude Code loads hooks only when a session starts.
-   To see the hooks that are loaded, type `/hooks`.
+   Claude Code loads plugins only when a session starts.
+   In a session that is already open, type `/reload-plugins` instead.
 
-To check that the checker works, run this command:
+To check the install, run this command:
 
 ```
-echo "We will leverage this." | python3 ~/.claude/skills/plain-language/scripts/check.py --chat
+claude plugin details plain-language
 ```
 
-The checker reports that "leverage" must be fixed.
-It exits with code 1.
+It lists one skill and five hooks.
+In a session, type `/hooks` to see the hooks, or `/plain-language:plain-language` to load the skill.
+
+### How the hooks run
+
+The five hook commands are in `hooks/hooks.json`.
+Claude Code replaces `${CLAUDE_PLUGIN_ROOT}` in each command with the folder where it installed the plugin.
+
+If Python 3 is not installed, each hook exits without doing anything.
+Each command runs Python with the `-I` option.
+That option stops your project from changing what the hooks run.
+With it, Python does not load code from the project folder.
+It also ignores packages installed in your home folder, and any environment variable whose name starts with `PYTHON`.
+
+Each command ends with `|| exit 1`.
+If a hook's file is missing, Python exits with code 2.
+Claude Code treats exit code 2 as an instruction to block, so the prompt hook would block every message you send.
+`|| exit 1` changes the code to 1, so Claude Code reports an error and does not block anything.
 
 ### Use the skill without the hooks
 
-Step 1 on its own installs the skill.
+You can install the skill on its own, as a personal skill.
+Copy or link the folder `skills/plain-language` from this repository into `~/.claude/skills/`:
+
+```
+git clone https://github.com/auxesis/plain-language-skill.git
+cp -R plain-language-skill/skills/plain-language ~/.claude/skills/
+```
+
+To link the folder instead, run this command in place of `cp`:
+
+```
+ln -s "$PWD/plain-language-skill/skills/plain-language" ~/.claude/skills/plain-language
+```
+
+With a link, `git pull` in the clone updates the skill.
+
 Claude then loads the skill only when a task matches its description.
 For example, it loads the skill when you ask for a README, or for a review of text that is hard to read.
 Without the hooks, nothing checks Claude's replies or files.
 
-## Update
+Copy only the `skills/plain-language` folder, not the whole repository.
+Claude Code loads a folder in `~/.claude/skills/` as a plugin if it contains `.claude-plugin/plugin.json`.
+The plugin's hooks would then run.
 
-```
-git -C ~/.claude/skills/plain-language pull
-```
+Do not install the plugin as well.
+If you do, the skill appears twice.
 
-The checks use the new version straight away.
-The core rules change at the start of the next session.
+## Move from the old install
 
-### Update from the JavaScript version
+Earlier versions had no plugin, so you installed them by hand.
+You cloned the repository into `~/.claude/skills/plain-language`, and added five hook entries to `~/.claude/settings.json`.
+If you installed the skill that way, remove the old install before you install the plugin.
 
-Earlier versions of this skill were written in JavaScript, and their hook commands run `node`.
-If your hook commands run `node`, follow these steps in this order:
+Otherwise each hook runs twice.
+One copy runs from `settings.json`, and the other runs from the plugin.
+The skill also appears twice, as `plain-language` and as `plain-language:plain-language`.
 
-1. Pull the new version, with the command above.
-   Until you finish step 2, each old hook reports an error, because its file is gone.
-2. In `~/.claude/settings.json`, replace your five hook entries with the entries in step 3 of the install steps.
-3. Start a new Claude Code session.
-
-## Remove
+Follow these steps in this order:
 
 1. Delete the five hook entries from `~/.claude/settings.json`.
-   Do this first, because each hook reports an error once its file is missing.
-2. Delete the skill folder:
+   Each one runs a file in `~/.claude/skills/plain-language/hooks/`.
+   In the JavaScript version, the commands run `node` instead of `python3`.
+2. Delete the old skill folder:
 
    ```
    rm -rf ~/.claude/skills/plain-language
    ```
 
-3. Start a new Claude Code session.
+   If `~/.claude/skills/plain-language` is a symbolic link to a clone somewhere else, delete only the link:
+
+   ```
+   rm ~/.claude/skills/plain-language
+   ```
+
+3. Follow steps 2 to 5 of the install steps.
+
+Do not run `git pull` in the old folder instead.
+This version adds `.claude-plugin/plugin.json`, so Claude Code would load the old folder as a plugin.
+Its hooks would then run as well as the hooks in `settings.json`.
+
+## Update
+
+```
+claude plugin marketplace update plain-language-skill
+claude plugin update plain-language@plain-language-skill
+```
+
+The first command gets the latest list of plugins from the marketplace.
+The second command installs the new version of the plugin.
+The new version loads in your next session, or when you type `/reload-plugins`.
+
+Claude Code can also update the plugin for you.
+It does not do this for this marketplace unless you turn it on.
+To turn it on, type `/plugin` in a session, open the **Marketplaces** tab, select `plain-language-skill`, and select **Enable auto-update**.
+
+## Remove
+
+1. Uninstall the plugin, then remove the marketplace:
+
+   ```
+   claude plugin uninstall plain-language@plain-language-skill
+   claude plugin marketplace remove plain-language-skill
+   ```
+
+2. Start a new Claude Code session.
 
 ## Skip a check
 
@@ -153,27 +195,68 @@ The checker never checks code blocks, inline code, URLs, or text in double quota
 
 | File | What it contains |
 |---|---|
-| `core.md` | The rules for every reply and file |
-| `SKILL.md` | The process for documents, rewrites, and reviews |
-| `references/guidelines.md` | Every guideline in both ISO standards, in our own words |
-| `references/content-guidance.md` | The GOV.UK rules, including the words to avoid |
-| `scripts/check.py` | The checker that the hooks use |
-| `scripts/rules.json` | The list of rules the checker applies |
-| `hooks/` | The four hooks |
-| `tests/` | Tests for the checker and the hooks |
+| `.claude-plugin/plugin.json` | The plugin's name, version, and licence |
+| `.claude-plugin/marketplace.json` | The marketplace that lists the plugin |
+| `skills/plain-language/SKILL.md` | The process for documents, rewrites, and reviews |
+| `skills/plain-language/core.md` | The rules for every reply and file |
+| `skills/plain-language/references/guidelines.md` | Every guideline in both ISO standards, in our own words |
+| `skills/plain-language/references/content-guidance.md` | The GOV.UK rules, including the words to avoid |
+| `skills/plain-language/scripts/check.py` | The checker that the hooks use |
+| `skills/plain-language/scripts/rules.json` | The list of rules the checker applies |
+| `hooks/hooks.json` | The commands that run the hooks |
+| `hooks/*.py` | The four hooks, and the code they share |
+| `tests/` | Tests for the checker, the hooks, and the plugin files |
 | `evals/` | The test prompts used to measure the skill |
 
 ## Check a file by hand
 
-From the skill folder, run:
+From the root of this repository, run:
 
 ```
-python3 scripts/check.py path/to/file.md
+python3 skills/plain-language/scripts/check.py path/to/file.md
 ```
+
+For text that is not in a file, pipe it in and add `--chat`:
+
+```
+echo "We will leverage this." | python3 skills/plain-language/scripts/check.py --chat
+```
+
+The checker reports that "leverage" must be fixed.
+It exits with code 1.
+
+Claude Code keeps its copy of the plugin in `~/.claude/plugins/cache/plain-language-skill/plain-language/`.
+That folder contains one folder for each version you have installed, such as `1.0.0`.
+The checker is in `skills/plain-language/scripts/check.py` inside that version's folder.
+
+## Local development
+
+To load the plugin from your clone for one session, start Claude Code with the `--plugin-dir` option:
+
+```
+claude --plugin-dir path/to/plain-language-skill
+```
+
+For that session, the plugin in your clone replaces the installed plugin.
+After you change a file, type `/reload-plugins` or start a new session.
+
+To check the plugin files, run these commands from the root of the repository:
+
+```
+claude plugin validate .
+claude plugin validate skills
+```
+
+The first command checks `.claude-plugin/marketplace.json` and `.claude-plugin/plugin.json`.
+The second command checks the skill.
+
+To release a change, increase `version` in `.claude-plugin/plugin.json`.
+Claude Code gives users a new version only when that value changes.
+If you push a change and do not change the version, users who installed the plugin do not get the change.
 
 ## Run the tests
 
-From the skill folder, run this command:
+From the root of this repository, run this command:
 
 ```
 mise run test
@@ -181,7 +264,7 @@ mise run test
 
 If mise asks you to trust `mise.toml`, run `mise trust`.
 The `test` task runs `python3 -m unittest` with the Python version that `mise.toml` names.
-To run the tests with Python 3.9, the oldest version the skill supports, run this command:
+To run the tests with Python 3.9, the oldest version the plugin supports, run this command:
 
 ```
 mise exec python@3.9 -- python3 -m unittest
@@ -201,8 +284,8 @@ Once the feedback is applied, the pull request is closed without merging.
 This repository is licensed under the Apache License 2.0, in `LICENSE`.
 The material adapted from the GOV.UK content guidance is an exception.
 It stays under the Open Government Licence v3.0.
-That material is in `references/content-guidance.md`.
-It is also in the rules `govuk-words-to-avoid` and `govuk-tone` in `scripts/rules.json`.
+That material is in `skills/plain-language/references/content-guidance.md`.
+It is also in the rules `govuk-words-to-avoid` and `govuk-tone` in `skills/plain-language/scripts/rules.json`.
 
 The file `NOTICE` credits the GOV.UK material.
 If you share this repository or a work based on it, you must keep that credit.
