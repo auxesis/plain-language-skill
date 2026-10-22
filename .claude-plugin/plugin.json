@@ -1,6 +1,5 @@
 {
   "name": "plain-language",
-  "version": "1.0.0",
   "description": "Makes Claude Code write in plain language, following ISO 24495-1:2023, ISO 24495-3:2026, and the GOV.UK content guidance. Hooks add the rules to every session and check each chat reply and each prose file.",
   "author": {
     "name": "Lindsay Holmwood"

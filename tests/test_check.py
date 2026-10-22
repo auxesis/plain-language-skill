@@ -597,14 +597,15 @@ class ThePlugin(unittest.TestCase):
                 self.assertEqual(result.returncode, 1)
 
     # The install id uses the marketplace entry's name, and the skill's prefix uses the
-    # manifest's name, so the two must be the same. A version in both places is ignored
-    # in the entry, so it is set in plugin.json only.
-    def test_the_marketplace_lists_the_plugin_at_the_root_under_the_same_name(self):
+    # manifest's name, so the two must be the same. Neither file sets a version, so Claude
+    # Code uses the commit as the version, and users get each commit when they update.
+    def test_the_marketplace_lists_the_plugin_at_the_root_under_the_same_name_and_no_version(self):
         plugin = read_json(".claude-plugin", "plugin.json")
         (listed,) = read_json(".claude-plugin", "marketplace.json")["plugins"]
         self.assertEqual(plugin["name"], "plain-language")
         self.assertEqual(listed["name"], plugin["name"])
         self.assertEqual(listed["source"], "./")
+        self.assertNotIn("version", plugin)
         self.assertNotIn("version", listed)
         self.assertTrue(os.path.isfile(os.path.join(ROOT, "skills", plugin["name"], "SKILL.md")))
 

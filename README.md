@@ -169,6 +169,10 @@ The first command gets the latest list of plugins from the marketplace.
 The second command installs the new version of the plugin.
 The new version loads in your next session, or when you type `/reload-plugins`.
 
+The plugin has no version number, so Claude Code uses a commit ID from this repository as its version.
+Each new commit on the `main` branch is a new version.
+If there is no new commit, the second command reports that the plugin is already at the latest version.
+
 Claude Code can also update the plugin for you.
 It does not do this for this marketplace unless you turn it on.
 To turn it on, type `/plugin` in a session, open the **Marketplaces** tab, select `plain-language-skill`, and select **Enable auto-update**.
@@ -210,7 +214,7 @@ The checker never checks code blocks, inline code, URLs, or text in double quota
 
 | File | What it contains |
 |---|---|
-| `.claude-plugin/plugin.json` | The plugin's name, version, and licence |
+| `.claude-plugin/plugin.json` | The plugin's name, description, and licence |
 | `.claude-plugin/marketplace.json` | The marketplace that lists the plugin |
 | `skills/plain-language/SKILL.md` | The process for documents, rewrites, and reviews |
 | `skills/plain-language/core.md` | The rules for every reply and file |
@@ -241,7 +245,8 @@ The checker reports that "leverage" must be fixed.
 It exits with code 1.
 
 Claude Code keeps its copy of the plugin in `~/.claude/plugins/cache/plain-language-skill/plain-language/`.
-That folder contains one folder for each version you have installed, such as `1.0.0`.
+That folder contains one folder for each version you have installed.
+Each of those folders is named after a commit ID.
 The checker is in `skills/plain-language/scripts/check.py` inside that version's folder.
 
 ## Local development
@@ -263,11 +268,15 @@ claude plugin validate skills
 ```
 
 The first command checks `.claude-plugin/marketplace.json` and `.claude-plugin/plugin.json`.
+It warns that the plugin has no version.
+The plugin leaves out the version on purpose.
 The second command checks the skill.
 
-To release a change, increase `version` in `.claude-plugin/plugin.json`.
-Claude Code gives users a new version only when that value changes.
-If you push a change and do not change the version, users who installed the plugin do not get the change.
+### Release a change
+
+Merge the change into the `main` branch.
+The plugin has no version number, so each commit on `main` is a new version.
+Users get it when they run the update commands, or when auto-update runs.
 
 ## Run the tests
 
