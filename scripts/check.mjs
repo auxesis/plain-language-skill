@@ -14,7 +14,7 @@
 // sentence at all (ISO 24495-1 Principle 1), whether a word is familiar to this
 // reader, or whether a metaphor that is not on the list is a metaphor. Those stay
 // with the writer.
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { countWords, PLACEHOLDERS, proseUnits, sentences } from "./prose.mjs";
@@ -635,6 +635,8 @@ async function main(argv) {
   process.exitCode = total("block") > 0 ? 1 : 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Node gives import.meta.url as the real path of this file, so a command that reaches
+// it through a symlink, such as ~/.claude/skills/plain-language, is resolved first.
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   await main(process.argv.slice(2));
 }

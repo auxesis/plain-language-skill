@@ -1,7 +1,7 @@
 // Run with: node --test ~/.claude/skills/plain-language/tests/*.test.mjs
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
@@ -274,6 +274,15 @@ describe("the command line", () => {
     assert.equal(good.status, 0);
   });
 
+  it("runs when it is reached through a symlink", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "plain-language-"));
+    const link = path.join(dir, "check.mjs");
+    symlinkSync(cli, link);
+    const bad = spawnSync("node", [link, "--chat"], { input: "We did it in order to test it.", encoding: "utf8" });
+    assert.equal(bad.status, 1);
+    assert.match(bad.stdout, /must fix/);
+  });
+
   it("passes its own skill files", () => {
     const files = ["SKILL.md", "core.md", "references/guidelines.md"].map((file) => path.join(SKILL, file));
     const out = JSON.parse(execFileSync("node", [cli, "--json", ...files], { encoding: "utf8" }));
@@ -371,6 +380,13 @@ describe("the hooks", () => {
     const off = path.join(dir, "rules.md");
     writeFileSync(off, "<!-- plain-language-check: off -->\nin order to\n");
     assert.equal(runHook("file-guard.mjs", { tool_name: "Write", tool_input: { file_path: off } }).stdout, "");
+  });
+
+  it("the file hook still checks a file that only mentions the marker in a sentence", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "plain-language-"));
+    const readme = path.join(dir, "README.md");
+    writeFileSync(readme, "To skip a file, put `plain-language-check: off` on a line of its own.\n\nWe did it in order to test it.\n");
+    assert.match(runHook("file-guard.mjs", { tool_name: "Write", tool_input: { file_path: readme } }).stdout, /"decision":"block"/);
   });
 
   it("the session hook adds core.md, for a session and for a subagent", () => {
