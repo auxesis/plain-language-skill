@@ -3,6 +3,50 @@
 This skill makes Claude Code write in plain language.
 It follows ISO 24495-1:2023, ISO 24495-3:2026, and the GOV.UK content guidance.
 
+## Example: the same request, without and with the skill
+
+The request asked Claude for a short message to a manager about a failed database backup.
+It included these notes:
+
+```text
+- nightly pg_dump kicked off 02:00 as usual
+- took 3h10m, normally ~40m. events table is now 180GB since we turned on audit logging last Tues
+- job has a 3h timeout so it got killed before the S3 upload
+- so no backup from last night. last good one is the night before, finished 02:41
+- plan: bump timeout to 6h tonight, then split audit rows into their own dump next sprint
+```
+
+Each reply below is from a single run on 22 October 2026, with Claude Opus 5.5 in Claude Code 2.1.306.
+The run without the skill had every hook and skill turned off.
+In both replies, the last paragraph is a note to the person who asked, not part of the message.
+
+### Without the skill
+
+The reply also had a subject line, a greeting, and a sign-off.
+This README leaves them out.
+
+> Last night's database backup didn't finish. The pg_dump started at 02:00 as usual but ran for 3h10m instead of the normal ~40 minutes. The job has a 3-hour timeout, so it was killed before the upload to S3, and we have no backup from last night. It slowed down because the events table has grown to 180GB since we turned on audit logging last Tuesday. Our most recent good backup is from the night before, finished at 02:41. <!-- plain-language-allow -->
+>
+> Tonight we're raising the job timeout to 6 hours so the backup can finish. Next sprint we'll move the audit rows into their own separate dump. That should bring the main backup back to its normal run time, and the growing audit log won't be able to block it again. <!-- plain-language-allow -->
+>
+> Your manager will probably ask whether you're running a backup by hand today rather than waiting for tonight's job. If you are, it's worth adding a line saying so. <!-- plain-language-allow -->
+
+### With the skill
+
+> Last night's database backup failed. Our most recent good backup is from the night before, and it finished at 02:41. Last night's backup started at 02:00 and ran for 3 hours 10 minutes, compared with the usual 40 minutes. The backup job has a 3-hour time limit, so the job was stopped before it uploaded the backup to S3. The backup now takes longer because the events table has grown to 180 GB since we turned on audit logging last Tuesday.
+>
+> Tonight, we will raise the time limit to 6 hours so the backup can finish. Next sprint, we will back up the audit rows separately from the rest of the database.
+>
+> Your notes say the backup ran for 3 hours 10 minutes, but the time limit is 3 hours. Your manager may ask how both of those can be true. If you know the reason, add one sentence that explains it.
+
+### What the skill changed
+
+- **The most important facts come first.** The backup failed, and the last good backup is from the night before.
+- **Negatives are written in full.** The reply says "did not", not "didn't".
+- **Numbers are written in words and units.** The reply says "3 hours 10 minutes" and "180 GB", not "3h10m", "~40", or "180GB".
+- **The reply claims nothing that the notes do not say.** The reply without the skill says the audit log "won't be able to block it again". The notes do not say that.
+- **The reply points out a gap in the notes.** The backup ran for longer than its time limit, and the notes do not explain how.
+
 ## What runs, and when
 
 - **Every session and subagent:** a hook adds the core rules in `core.md` to the context.
@@ -100,7 +144,7 @@ The core rules change at the start of the next session.
 ## Skip a check
 
 - **Skip one line:** put `plain-language-allow` on the line. In Markdown, write it in a comment: `<!-- plain-language-allow -->`.
-- **Skip a whole file:** put `plain-language-check: off` anywhere in the file. The file hook then does not check it.
+- **Skip a whole file:** put `<!-- plain-language-check: off -->` in the file, on a line of its own. The file hook then does not check the file. The marker does not work inside a sentence.
 
 The checker never checks code blocks, inline code, URLs, or text in double quotation marks.
 
