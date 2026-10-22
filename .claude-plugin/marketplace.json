@@ -1,0 +1,13 @@
+{
+  "name": "plain-language-skill",
+  "description": "The plain-language plugin for Claude Code.",
+  "owner": {
+    "name": "Lindsay Holmwood"
+  },
+  "plugins": [
+    {
+      "name": "plain-language",
+      "source": "./"
+    }
+  ]
+}

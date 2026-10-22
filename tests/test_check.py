@@ -348,14 +348,6 @@ def run_hook(name, event, cwd=None, env=None):
     return run([os.path.join(ROOT, "hooks", name)], json.dumps(event), cwd=cwd, env=env)
 
 
-def readme_hook_commands():
-    """Each (event, command) pair in the hooks JSON of the README's install steps."""
-    with open(os.path.join(ROOT, "README.md"), encoding="utf-8") as handle:
-        block = re.search(r"```json\n(.*?)```", handle.read(), re.DOTALL).group(1)
-    hooks = json.loads(block)["hooks"]
-    return [(event, hook["command"]) for event, entries in hooks.items() for entry in entries for hook in entry["hooks"]]
-
-
 class TheHooks(unittest.TestCase):
     def test_reads_every_text_block_claude_wrote_since_the_persons_last_message(self):
         transcript = "\n".join(
@@ -476,28 +468,102 @@ class TheHooks(unittest.TestCase):
                 self.assertNotIn("project folder", result.stderr)
                 self.assertTrue(json.loads(result.stdout))
 
-    # New in the Python version. Python exits with code 2 when the file it is asked to run
-    # is missing, and Claude Code reads exit code 2 from a prompt hook as an instruction
-    # to block the prompt. Each command in the README must turn that into exit code 1.
-    def test_no_hook_command_in_the_readme_exits_with_code_2_when_its_file_is_missing(self):
-        # HOME is an empty folder, so no hook file exists. PATH starts with a python3 that
-        # is this Python, so each command reaches Python instead of exiting at "command -v".
-        programs = temporary_folder(self)
-        os.symlink(sys.executable, os.path.join(programs, "python3"))
-        env = {**os.environ, "HOME": temporary_folder(self), "PATH": programs + os.pathsep + os.environ.get("PATH", "")}
-        commands = readme_hook_commands()
-        self.assertEqual(len(commands), 5)
-        for event, command in commands:
-            with self.subTest(event=event):
-                result = subprocess.run(["/bin/sh", "-c", command], input="{}", capture_output=True, encoding="utf-8", env=env)
-                self.assertIn("No such file", result.stderr)
-                self.assertNotEqual(result.returncode, 2)
-                self.assertEqual(result.returncode, 1)
-
     def test_the_prompt_hook_adds_a_one_line_reminder(self):
         result = json.loads(run_hook("prompt-reminder.py", {}).stdout)
         self.assertEqual(result["hookSpecificOutput"]["hookEventName"], "UserPromptSubmit")
         self.assertNotIn("\n", result["hookSpecificOutput"]["additionalContext"])
+
+    # The plugin can be installed anywhere, so the hooks name core.md by the path they
+    # find from their own location.
+    def test_the_reminder_and_the_findings_name_the_core_md_that_exists(self):
+        reminder = json.loads(run_hook("prompt-reminder.py", {}).stdout)["hookSpecificOutput"]["additionalContext"]
+        file = os.path.join(temporary_folder(self), "doc.md")
+        write(file, "We did it in order to test it.\n")
+        reason = json.loads(run_hook("file-guard.py", {"tool_name": "Write", "tool_input": {"file_path": file}}).stdout)["reason"]
+        for text in (reminder, reason):
+            with self.subTest(text=text[:40]):
+                path = re.search(r"(/\S+/core\.md)", text).group(1)
+                self.assertEqual(path, os.path.join(SKILL, "core.md"))
+                self.assertTrue(os.path.isfile(path))
+
+
+def plugin_hooks():
+    """Each (event, matcher, hook) in the plugin's hooks/hooks.json."""
+    with open(os.path.join(ROOT, "hooks", "hooks.json"), encoding="utf-8") as handle:
+        hooks = json.load(handle)["hooks"]
+    return [(event, entry.get("matcher"), hook) for event, entries in hooks.items() for entry in entries for hook in entry["hooks"]]
+
+
+def read_json(*path):
+    with open(os.path.join(ROOT, *path), encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+GUARD = "command -v python3 >/dev/null 2>&1 || exit 0; "
+HOOK_FILE = re.compile(r'python3 -I "\$\{CLAUDE_PLUGIN_ROOT\}/(hooks/[\w-]+\.py)"')
+
+
+def run_command(test, command, plugin_root):
+    """Runs a hook command the way Claude Code does: it puts the plugin's folder in place of
+    ${CLAUDE_PLUGIN_ROOT}, also sets that variable, and runs the command with a shell."""
+    # PATH starts with a python3 that is this Python, so the command reaches Python
+    # instead of exiting at "command -v".
+    programs = temporary_folder(test)
+    os.symlink(sys.executable, os.path.join(programs, "python3"))
+    env = {**os.environ, "CLAUDE_PLUGIN_ROOT": plugin_root, "PATH": programs + os.pathsep + os.environ.get("PATH", "")}
+    command = command.replace("${CLAUDE_PLUGIN_ROOT}", plugin_root)
+    return subprocess.run(["/bin/sh", "-c", command], input="{}", capture_output=True, encoding="utf-8", env=env)
+
+
+class ThePlugin(unittest.TestCase):
+    def test_hooks_json_has_one_command_for_each_of_the_five_events(self):
+        hooks = plugin_hooks()
+        self.assertEqual(
+            [(event, matcher) for event, matcher, _ in hooks],
+            [("SessionStart", None), ("SubagentStart", None), ("UserPromptSubmit", None), ("Stop", None), ("PostToolUse", "Write|Edit|MultiEdit")],
+        )
+        for event, _, hook in hooks:
+            with self.subTest(event=event):
+                self.assertEqual(hook["type"], "command")
+                self.assertEqual(hook["timeout"], 30)
+
+    def test_each_hook_command_runs_a_file_that_exists_and_has_the_guard_and_exit_1_at_the_end(self):
+        for event, _, hook in plugin_hooks():
+            with self.subTest(event=event):
+                command = hook["command"]
+                self.assertTrue(command.startswith(GUARD), command)
+                self.assertTrue(command.endswith(" || exit 1"), command)
+                self.assertTrue(os.path.isfile(os.path.join(ROOT, HOOK_FILE.search(command).group(1))), command)
+
+    def test_each_hook_command_runs_its_hook_from_the_plugin_folder(self):
+        for event, _, hook in plugin_hooks():
+            with self.subTest(event=event):
+                result = run_command(self, hook["command"], ROOT)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stderr, "")
+
+    # Python exits with code 2 when the file it is asked to run is missing, and Claude Code
+    # reads exit code 2 from a prompt hook as an instruction to block the prompt. Each
+    # command must turn that into exit code 1.
+    def test_no_hook_command_exits_with_code_2_when_its_file_is_missing(self):
+        empty = temporary_folder(self)
+        for event, _, hook in plugin_hooks():
+            with self.subTest(event=event):
+                result = run_command(self, hook["command"], empty)
+                self.assertIn("No such file", result.stderr)
+                self.assertEqual(result.returncode, 1)
+
+    # The install id uses the marketplace entry's name, and the skill's prefix uses the
+    # manifest's name, so the two must be the same. A version in both places is ignored
+    # in the entry, so it is set in plugin.json only.
+    def test_the_marketplace_lists_the_plugin_at_the_root_under_the_same_name(self):
+        plugin = read_json(".claude-plugin", "plugin.json")
+        (listed,) = read_json(".claude-plugin", "marketplace.json")["plugins"]
+        self.assertEqual(plugin["name"], "plain-language")
+        self.assertEqual(listed["name"], plugin["name"])
+        self.assertEqual(listed["source"], "./")
+        self.assertNotIn("version", listed)
+        self.assertTrue(os.path.isfile(os.path.join(ROOT, "skills", plugin["name"], "SKILL.md")))
 
 
 if __name__ == "__main__":
