@@ -142,7 +142,7 @@ class PhraseRules(unittest.TestCase):
     def test_does_not_report_a_literal_use_that_the_pattern_excludes(self):
         self.assertNotIn("figurative-jargon", ids("Print it in landscape orientation."))
 
-    # New in the Python version: rules.json holds JavaScript patterns.
+    # New in the Python version: rules.json contains JavaScript patterns.
 
     def test_compiles_every_pattern_in_rules_json_without_a_warning(self):
         with warnings.catch_warnings():
@@ -271,6 +271,101 @@ def _allows_round_two(self, text):
 
 add_cases(RulesFromTheReviewOfRoundTwo, "blocks", ROUND_TWO_BLOCKED, _blocks_round_two)
 add_cases(RulesFromTheReviewOfRoundTwo, "allows", ROUND_TWO_ALLOWED, _allows_round_two)
+
+# The review of round three is in pull request 1. Most of these texts are quoted from it.
+ROUND_THREE_BLOCKED = [
+    ("repeated-word", "Now the stand-in in each test:"),
+    ("repeated-word", "Read the the file first."),
+    ("question-heading-items", "## Questions for the next round\n\n- **Weekly cost estimate:** where it gets posted.\n"),
+    ("question-heading-items", "## Questions for the next round\n\n- **Tool setup:** the mise tool-setup step takes about 16% of all job time.\n"),
+    ("question-heading-items", "## Open questions\n\n### Billing\n\n1. The names of the summary checks that become required.\n"),
+    ("whether-item", "## Facts I still need to check\n\n- Whether the RunsOn trial licence has an end date.\n"),
+    ("whether-item", "- **Dependabot:** whether to group its updates.\n"),
+    # From the review of the first description of pull request 10: things given a person's
+    # verb, in headings as well as in sentences.
+    ("thing-given-person-verb", "## What the checker cannot see\n\nThe checker never checks code blocks.\n"),
+    ("thing-given-person-verb", "## How the checks behave on real text\n\nThe checks ran over 77 files.\n"),
+    ("thing-given-person-verb", "## Each review comment, and the change that answers it\n\nThe table lists them.\n"),
+    ("thing-given-person-verb", "The test cannot see the new file."),
+]
+
+ROUND_THREE_ALLOWED = [
+    "Now the stand-in for each test:",
+    "The reviewer answered each comment.",
+    "You can see the file in the pull request.",
+    "You can see the table below.",
+    # Database documentation says that a transaction sees data. The user allowed it.
+    "Under SERIALIZABLE, each transaction sees the data as it was when the transaction started.",
+    "## Review comments and changes\n\nThe checker skips code blocks.\n",
+    "Run `npm test` `--watch` again.",
+    "## Questions for the next round\n\n- **Dependabot:** should updates be grouped?\n  In 20 days, 40 Dependabot branches cost $115.\n- **Weekly cost estimate:** where does it get posted?\n",
+    "## Questions\n\n- Is the job done?\n\n## Next steps\n\n- Run the tests again.\n",
+    "## Decisions\n\n- **Dependabot:** updates are grouped by week.\n",
+    "- Whether or not you use mise, run the tests before you push.\n",
+    # Found in the sample of real replies: inline code becomes the word CODE.
+    "It cancels one of the transactions with a serialisation error, code `40001`.",
+    # A nested item under a question contains a detail.
+    "## Questions waiting for your answers\n\n1. **Q2:** which checks run only once per pull request?\n   - The Test EQL heavy suite.\n   - udeps and Miri.\n",
+    # A part that asks its questions in paragraphs has lists of options.
+    "## Questions\n\n**Q1:** Should stack use a merge queue? These are the choices:\n\n- (a) A merge queue.\n- (b) A label that a person adds.\n",
+    "## Questions for this round\n\n**Q1. What starts the pre-merge run.** There are two options:\n\n1. A GitHub merge queue.\n2. A label that a person adds.\n\nShall the pre-merge run be a GitHub merge queue?\n",
+]
+
+ROUND_THREE_ADVISED = [
+    ("pronoun-start", "They skip any new or unstaged file without failing."),
+    ("pronoun-start", "Their output does not list which files they read."),
+    ("pronoun-start", "It runs at midnight."),
+    ("pronoun-start", "This means that the job stops."),
+    ("pronoun-start", "These are the two options."),
+    ("purpose-last", "- calls the callback with an empty list of entries and the observer, to match the real callback signature\n"),
+    ("purpose-last", "We call the job twice, to make sure it stops."),
+]
+
+ROUND_THREE_NOT_ADVISED = [
+    ("pronoun-start", "The guards skip any new or unstaged file without failing."),
+    ("pronoun-start", "This file is new, and these tests pass."),
+    ("pronoun-start", "This process runs every night."),
+    ("pronoun-start", "The guards read only files that git tracks, so they skip new files."),
+    ("purpose-last", "- match the real callback signature, by calling the callback with the observer and an empty list of entries\n"),
+    ("purpose-last", "Give the report to the team, to the person on call, or to me."),
+]
+
+
+class RulesFromTheReviewOfRoundThree(unittest.TestCase):
+    def test_reports_a_question_heading_item_only_under_that_heading(self):
+        text = "## Questions\n\n- Is the job done?\n- The job is done.\n\n## Notes\n\n- The job is done.\n"
+        found = [one["line"] for one in findings(text, rules) if one["id"] == "question-heading-items"]
+        self.assertEqual(found, [4])
+
+    def test_never_blocks_on_a_pronoun_or_a_purpose_at_the_end(self):
+        for _, text in ROUND_THREE_ADVISED:
+            with self.subTest(text=text):
+                self.assertEqual(blocking(text, "chat"), [])
+
+
+def _blocks_round_three(self, case):
+    rule, text = case
+    self.assertIn(rule, blocking(text, "chat"))
+
+
+def _allows_round_three(self, text):
+    self.assertEqual(blocking(text, "chat"), [])
+
+
+def _advises_round_three(self, case):
+    rule, text = case
+    self.assertIn(rule, ids(text, "chat"))
+
+
+def _does_not_advise_round_three(self, case):
+    rule, text = case
+    self.assertNotIn(rule, ids(text, "chat"))
+
+
+add_cases(RulesFromTheReviewOfRoundThree, "blocks", ROUND_THREE_BLOCKED, _blocks_round_three)
+add_cases(RulesFromTheReviewOfRoundThree, "allows", ROUND_THREE_ALLOWED, _allows_round_three)
+add_cases(RulesFromTheReviewOfRoundThree, "advises", ROUND_THREE_ADVISED, _advises_round_three)
+add_cases(RulesFromTheReviewOfRoundThree, "does_not_advise", ROUND_THREE_NOT_ADVISED, _does_not_advise_round_three)
 
 
 class StructureRules(unittest.TestCase):

@@ -56,7 +56,7 @@ Sometimes you cannot tell who the reader is. If a wrong guess would waste the us
 ### 2. Choose the content
 
 List the questions this reader needs answered (1: 5.1.6).
-Each part of the document answers one of them.
+Plan one part of the document for each question.
 Leave out everything else, including how you found things out, unless the reader needs it to trust the result.
 Never leave out what the reader needs to act safely: risks, limits, failures, and what nobody checked.
 
@@ -115,12 +115,13 @@ Answer each question (Annex B of both standards, combined):
 1. Is the most important message at the start?
 2. Does every part answer a question this reader has? Is anything they need missing?
 3. Can the reader find each part from the headings alone?
-4. Is every term one this reader knows, or explained where it first appears?
-5. Does each sentence say one thing, literally, and name who does it?
-6. Is each claim marked as checked, inferred or guessed, with its source?
-7. Is every comparison complete, and does every number have a unit and context?
-8. Is the tone respectful, and the same throughout?
-9. In a rewrite, is every fact from the original present, or cut on purpose?
+4. Does every item fit its heading?
+5. Is every term one this reader knows, or explained where it first appears?
+6. Does each sentence say one thing, literally, and name who does it?
+7. Is each claim marked as checked, inferred or guessed, with its source?
+8. Is every comparison complete, and does every number have a unit and context?
+9. Is the tone respectful, and the same throughout?
+10. In a rewrite, is every fact from the original present, or cut on purpose?
 
 #### c. Tell the user what your check cannot show
 

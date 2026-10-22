@@ -20,7 +20,7 @@ from collections import namedtuple
 from functools import lru_cache
 
 FENCE = re.compile(r"^\s*(```|~~~)")
-HEADING = re.compile(r"^\s{0,3}#{1,6}\s+")
+HEADING = re.compile(r"^\s{0,3}(#{1,6})\s+")
 TABLE_ROW = re.compile(r"^\s*\|")
 TABLE_DIVIDER = re.compile(r"^[\s|:-]+$")
 LIST_ITEM = re.compile(r"^(\s*)(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?")
@@ -91,6 +91,8 @@ class Piece:
         self.text = ""
         self.masked = ""
         self.indent = 0
+        # For a heading, the number of # marks: 1 for a title, 2 for a section, and so on.
+        self.level = 0
         # Each segment is (start, line): the offset in `text` where a source line begins.
         self.segments = []
 
@@ -166,9 +168,11 @@ def prose_units(markdown):
             finish()
             continue
 
-        if HEADING.search(line):
+        heading = HEADING.search(line)
+        if heading:
             finish()
             current = Piece("heading", number)
+            current.level = len(heading.group(1))
             current.add(CLOSING_HEADING_MARKS.sub("", HEADING.sub("", line, count=1), count=1), number)
             finish()
             continue

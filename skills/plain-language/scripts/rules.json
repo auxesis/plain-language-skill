@@ -946,8 +946,10 @@
       "(slipstream/banned-language.json), which works on the subject, not the word: a member holds a",
       "capability, and that is literal. A thing doing it is the figure of speech.",
       "'things' are the subjects checked, and CODE is anything written in code formatting.",
-      "'between' lists the adverbs and modal verbs allowed between the subject and the verb, never a noun.",
-      "'person' exempts a match when a person is the subject just before the verb."
+      "'between' lists the words allowed between the subject and the verb: \"that\", \"which\", adverbs, and modal verbs, never a noun.",
+      "'person' exempts a match when a person is the subject just before the verb.",
+      "'heldVerbs' are reported before a held thing whatever the subject, as in \"holds the data\".",
+      "Verbs of seeing are not in it: a person sees a table, and a transaction sees the data."
     ],
     "clause": "1: 5.3.2 a), b)",
     "say": "A thing is given a person's verb. Use the literal verb: \"contains\", \"has\", \"lists\", \"shows\", \"stores\", \"includes\", or say what was added or changed.",
@@ -962,8 +964,11 @@
       "caption",
       "cell",
       "cells",
+      "change",
+      "changes",
       "check",
       "checker",
+      "checks",
       "class",
       "column",
       "columns",
@@ -1067,9 +1072,10 @@
       "these",
       "those"
     ],
-    "blockVerbs": "holds|hold|holding|carries|carry|carrying|gains|gained|houses|housed|owns|owned|boasts|sports|knows|knew|wants|wanted|thinks|thought|feels|likes|cares",
-    "pronounVerbs": "holds|hold|carries|carry|gains|houses|owns|knows|wants|thinks|feels",
-    "between": "only|never|still|also|just|already|then|now|always|often|sometimes|no longer|only ever|actually|simply|therefore|thus|either|itself|each|both|has to|have to|had to|needs to|need to|must|cannot|could|may|might|should|would|will not|will|does not|do not|did not|can",
+    "blockVerbs": "holds|hold|holding|carries|carry|carrying|gains|gained|houses|housed|owns|owned|boasts|sports|knows|knew|wants|wanted|thinks|thought|feels|likes|cares|sees|see|saw|behaves|behave|behaved|answers|answer|answered|understands|understand|understood|notices|notice|noticed",
+    "heldVerbs": "holds|hold|holding|carries|carry|carrying|gains|gained|houses|housed|owns|owned|boasts|sports|knows|knew|wants|wanted|thinks|thought|feels|likes|cares",
+    "pronounVerbs": "holds|hold|carries|carry|gains|houses|owns|knows|wants|thinks|feels|sees|behaves|understands|notices",
+    "between": "that|which|only|never|still|also|just|already|then|now|always|often|sometimes|no longer|only ever|actually|simply|therefore|thus|either|itself|each|both|has to|have to|had to|needs to|need to|must|cannot|could|may|might|should|would|will not|will|does not|do not|did not|can",
     "heldThings": [
       "nothing",
       "its own",

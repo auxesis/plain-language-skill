@@ -106,7 +106,7 @@ def load_rules(file=os.path.join(HERE, "rules.json")):
                 re.compile(rf"\b(?:{things})\s+{between}({tv['blockVerbs']})\b", re.IGNORECASE),
                 re.compile(rf"\b(?:{'|'.join(tv['pronouns'])})\s+{between}({tv['pronounVerbs']})\b", re.IGNORECASE),
             ],
-            "held": re.compile(rf"\b(?:{tv['blockVerbs']})\s+(?:{'|'.join(tv['heldThings'])})\b", re.IGNORECASE),
+            "held": re.compile(rf"\b(?:{tv['heldVerbs']})\s+(?:{'|'.join(tv['heldThings'])})\b", re.IGNORECASE),
             "thingSubject": re.compile(
                 rf"^\s*(?:(?:the|a|an|this|that|each|every|its|our|your|their|one|new)\s+)?(?:[\w-]+\s+){{0,2}}?(?:{things})\b",
                 re.IGNORECASE,
@@ -307,6 +307,53 @@ COMMON_VERBS = re.compile(
 SEMICOLON_CLAUSE = re.compile(r";\s+[a-z]")
 
 
+# A sentence that starts with a pronoun, not the name of its subject: "They skip any new
+# file". "This" and "These" count only before a verb, because "This file" names the
+# subject. After "This", a verb is a helping verb or a word that ends in "s". The word must
+# not end in "ss", "us" or "is", so the checker does not report "This process".
+ADVERB = r"(?:(?:also|only|still|just|then|now|alone|already|usually|often|always|never)\s+)?"
+PRONOUN_START = re.compile(
+    r"^[\"'“‘(\[]*(?:(It|They|Their|Its)\b"
+    rf"|(This)\s+{ADVERB}(?:is|was|has|had|does|did|can|cannot|could|will|would|should|must|may|might|(?![a-z]*(?:ss|us|is)\b)[a-z]+s)\b"
+    rf"|(These)\s+{ADVERB}(?:are|were|have|had|do|did|can|cannot|could|will|would|should|must|may|might|include|mean|depend|seem|come|make|give|take|show|need|run|cost)\b)"
+)
+# A purpose at the end of a sentence: "calls the callback with the observer, to match the
+# real callback signature". The word after "to" must not start a noun phrase, as in
+# "to the team".
+PURPOSE_LAST = re.compile(
+    r",\s+to\s+(?!(?:the|a|an|this|that|these|those|my|your|his|her|its|our|their|them|him|me|us|you|it|each|every|all|some|any|no|one|both|either|neither|which|what|whom)\b)[a-z]+\b[^,;:]*$"
+)
+
+
+def pronoun_start_findings(piece, sentence, masked):
+    match = PRONOUN_START.search(masked.strip())
+    if not match:
+        return []
+    word = next(group for group in match.groups() if group)
+    return [
+        finding(
+            {"id": "pronoun-start", "severity": "advise", "clause": "1: 5.3.2 a); 5.3.3 a)"},
+            piece,
+            sentence.offset,
+            f'This sentence starts with "{word}". Start it with the name of its subject: "The guards skip any new file", not "They skip any new file". A pronoun later in the sentence is fine.',
+        ),
+    ]
+
+
+def purpose_last_findings(piece, sentence, masked):
+    match = PURPOSE_LAST.search(masked.strip())
+    if not match:
+        return []
+    return [
+        finding(
+            {"id": "purpose-last", "severity": "advise", "clause": "1: 5.2.2 a)"},
+            piece,
+            sentence.offset,
+            'The purpose comes last, after ", to". Put the outcome first, then the method: "match the real callback signature, by calling the callback with the observer".',
+        ),
+    ]
+
+
 def is_fragment(text):
     trimmed = text.strip()
     if not ING_START.search(trimmed) or ING_NOUNS.search(trimmed):
@@ -333,6 +380,8 @@ def sentence_findings(piece, rules):
         found.extend(two_ideas_findings(piece, sentence, masked))
         found.extend(comma_findings(piece, sentence, masked))
         found.extend(sentence_phrase_findings(piece, sentence, masked, rules))
+        found.extend(pronoun_start_findings(piece, sentence, masked))
+        found.extend(purpose_last_findings(piece, sentence, masked))
         for pattern in ASIDES:
             match = pattern.search(masked)
             if not match:
@@ -421,6 +470,10 @@ def heading_findings(piece, rules):
                 "This heading does not say what the section contains. Name the topic, or start with a verb for a task.",
             ),
         )
+    # A heading can give a thing a person's verb too: "What the checker cannot see".
+    for sentence in sentences(piece.text):
+        masked = piece.masked[sentence.offset : sentence.offset + len(sentence.text)]
+        found.extend(thing_verb_findings(piece, sentence, masked, rules))
     return found
 
 
@@ -443,6 +496,96 @@ def noun_heavy_findings(piece):
                 f"This sentence has {len(nouns)} nouns made from verbs ({', '.join(nouns[:4])}). Turn some back into verbs and name who does them.",
             ),
         )
+    return found
+
+
+# The same word twice in a row, as in "the the". The first word can end a hyphenated word,
+# as in "the stand-in in each test". CODE and URL stand for code and links. Two of them can
+# come side by side.
+REPEATED_WORD = re.compile(r"\b([^\W\d_]+)\s+\1\b", re.IGNORECASE)
+
+
+def repeated_word_findings(piece):
+    found = []
+    for match in REPEATED_WORD.finditer(piece.masked):
+        if any(word in PLACEHOLDERS for word in match.group(0).split()):
+            continue
+        found.append(
+            {
+                **finding(
+                    {"id": "repeated-word", "severity": "block", "clause": "1: 5.3.3 a)"},
+                    piece,
+                    match.start(),
+                    'The same word comes twice in a row, which is hard to read. Write "the stand-in for each test", not "the stand-in in each test".',
+                ),
+                "match": match.group(0),
+            }
+        )
+    return found
+
+
+# Under a heading about questions, each list item must be a direct question. Write
+# "Dependabot: should updates be grouped?", not "whether to group its updates". A heading
+# covers every item until the next heading at its level or above.
+#
+# Only top-level items are checked, because a nested item contains a detail. Some parts of
+# a section ask their questions in paragraphs, such as "Should stack use a merge queue? The
+# choices are:". The lists in those parts contain options and details, so their items are
+# not checked either.
+QUESTION_HEADING = re.compile(r"\bquestions?\b", re.IGNORECASE)
+QUESTION_MARK = re.compile(r"\?[\"'”’)\]]*(?:\s|$)")
+# A list item that starts with "Whether", after any label such as "Dependabot:". The item
+# "Whether or not you use mise, run the tests" is not reported. The clause after its comma
+# makes it a whole sentence.
+WHETHER_ITEM = re.compile(r"^(?:[^\s:][^:]{0,60}:\s+)?whether\b[^,]*$", re.IGNORECASE)
+
+
+def question_item_findings(pieces):
+    # The text between two headings is one part. Find the parts that ask a question in a
+    # paragraph, keyed by the line of the heading that starts the part.
+    asks_in_paragraphs = set()
+    start = 0
+    for piece in pieces:
+        if piece.kind == "heading":
+            start = piece.line
+        elif piece.kind == "paragraph" and QUESTION_MARK.search(piece.text):
+            asks_in_paragraphs.add(start)
+
+    found = []
+    headings = []
+    start = 0
+    for piece in pieces:
+        if piece.kind == "heading":
+            headings = [one for one in headings if one[0] < piece.level] + [(piece.level, bool(QUESTION_HEADING.search(piece.text)))]
+            start = piece.line
+            continue
+        if piece.kind != "item":
+            continue
+        first = sentences(piece.text)
+        first = first[0].text if first else piece.text
+        if WHETHER_ITEM.search(first.strip()):
+            found.append(
+                finding(
+                    {"id": "whether-item", "severity": "block", "clause": "1: 5.2.4"},
+                    piece,
+                    0,
+                    'This item starts with "whether", so it is a question written as a statement. Write it as a direct question, under a heading for questions: "Does the RunsOn trial licence have an end date?"',
+                ),
+            )
+        elif (
+            any(is_question for _, is_question in headings)
+            and piece.indent < 2
+            and start not in asks_in_paragraphs
+            and not QUESTION_MARK.search(first)
+        ):
+            found.append(
+                finding(
+                    {"id": "question-heading-items", "severity": "block", "clause": "1: 5.2.4"},
+                    piece,
+                    0,
+                    'This item is under a heading about questions, but it is not a question. Write it as a direct question that ends with "?", such as "Dependabot: should updates be grouped?". Put a statement under another heading.',
+                ),
+            )
     return found
 
 
@@ -684,9 +827,15 @@ def findings(markdown, rules=None, mode="file"):
         rules = load_rules()
     markdown = markdown.translate(WHITE_SPACE)
     pieces = prose_units(markdown)
-    found = [*source_findings(markdown, rules), *structure_findings(markdown), *abbreviation_findings(pieces, rules)]
+    found = [
+        *source_findings(markdown, rules),
+        *structure_findings(markdown),
+        *abbreviation_findings(pieces, rules),
+        *question_item_findings(pieces),
+    ]
     for piece in pieces:
         found.extend(phrase_findings(piece, rules))
+        found.extend(repeated_word_findings(piece))
         found.extend(heading_findings(piece, rules))
         found.extend(shouted_findings(piece, rules))
         if piece.kind in PROSE_KINDS:
