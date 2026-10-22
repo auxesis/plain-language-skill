@@ -1,0 +1,34 @@
+# Run the tests on every pull request, and on every push to main.
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# The token that GitHub gives each job can only read the repository.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # The skill supports Linux and macOS, so the tests run on both.
+    strategy:
+      # If the tests fail on one system, they still finish on the other.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The tests do not need the token, so checkout does not save it in the repository.
+          persist-credentials: false
+
+      # mise installs the tools that mise.toml names.
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+
+      # The test task in mise.toml runs the tests.
+      # If that task changes, this step runs the new command.
+      - run: mise run test
