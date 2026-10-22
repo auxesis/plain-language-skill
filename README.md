@@ -17,8 +17,6 @@ With the skill, Claude replies:
 
 > Your app could not connect to the database on the same computer. This usually means the database is not running, or the app's settings point to the wrong place.
 
-Both replies are from Claude Opus 5.5, on 22 October 2026.
-
 ## What runs, and when
 
 - **Every session and subagent:** a hook adds the core rules in `core.md` to the context.
