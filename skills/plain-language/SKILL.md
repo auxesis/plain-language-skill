@@ -56,7 +56,7 @@ Sometimes you cannot tell who the reader is. If a wrong guess would waste the us
 ### 2. Choose the content
 
 List the questions this reader needs answered (1: 5.1.6).
-Each part of the document answers one of them.
+Plan one part of the document for each question.
 Leave out everything else, including how you found things out, unless the reader needs it to trust the result.
 Never leave out what the reader needs to act safely: risks, limits, failures, and what nobody checked.
 

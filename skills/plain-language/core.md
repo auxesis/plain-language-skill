@@ -13,6 +13,7 @@ In the clause references below, "1:" means ISO 24495-1:2023. "3:" means ISO 2449
 
 - **Know the reader.** In chat, the reader is the person you are working with. For a file, work out who will read it, what they already know, and what they will do with it. (1: 5.1.2 to 5.1.4)
 - **Give them what they need, and nothing else.** Leave out what they do not need. Never leave out what they need to know: risks, failures, limits, and what you did not check. (1: 5.1.6)
+- **Describe the result, not how you reached it.** Leave out first versions, false starts, and mistakes you fixed before the reader saw the work. Leave out counts that do not change what the reader does. (1: 5.1.6)
 - **Answer the question that was asked, at the length it needs.** A request for a summary gets a summary, not everything you know. Do not add sections the reader did not ask for. (1: 5.1.6 d)
 
 ## Order
@@ -45,7 +46,7 @@ Explaining new terms is the rule broken most often. The terms you use while work
 - **Use words this reader knows.** Use a technical term only if the reader already uses it or needs to learn it, and explain it the first time. Spell out an abbreviation the first time, unless the reader already uses it. (1: 5.3.2 c to e)
 - **Choose the short, common word.** Write "use", "help" and "start", not "utilise", "facilitate" and "initiate". Do not use the words GOV.UK lists to avoid, such as "leverage", "robust", "key", "impact" and "tackle". Write "for example" and "that is", not "e.g." and "i.e.", and do not write "etc.". (GOV.UK; 1: 5.3.2)
 - **Expertise is no reason for dense text.** Specialists prefer plain English too, and the preference grows with their expertise. (GOV.UK)
-- **Give things literal verbs.** A file contains, a table lists, a page shows, and a link is added. Things do not hold, carry, gain, know, or want. People can hold things. (1: 5.3.2 a, b)
+- **Give things literal verbs.** A file contains, a table lists, a page shows, and a link is added. Things do not hold, carry, gain, know, want, see, behave, or answer. Write "The checker skips code blocks", not "The checker cannot see code blocks". This applies to headings too. People can hold things. (1: 5.3.2 a, b)
 - **Use one word for one thing.** Do not switch between synonyms for the same thing, and do not use one word for two things. (1: 5.3.2 g)
 - **Write words, not symbols.** Write "becomes", "about", "times", "compared with", "at most", "$3,300" and "October", not an arrow, "≈" or "~", "×", "vs", "≤", "$3.3k" and "Oct". Commands, paths, code, and error messages stay exact, in code formatting. (1: 5.3.2 d)
 
@@ -99,6 +100,7 @@ These rules come from the user and from GOV.UK, not from the ISO standards.
 - Use the serial comma in a list of three or more: "words, headings, and links".
 - Put "only" before the verb, where people say it: "The guards only read files that git tracks". Move it if that could be read two ways.
 - In a pull request description, an issue, or a comment on GitHub, write each paragraph on one line. GitHub shows every line break in that text.
+- A pull request description says what changed and why, usually in a short list. Say what you did not test. Do not add a section only to say that the tests pass, or how the branch was rebased or merged.
 
 ## Check before you send
 

@@ -470,6 +470,10 @@ def heading_findings(piece, rules):
                 "This heading does not say what the section contains. Name the topic, or start with a verb for a task.",
             ),
         )
+    # A heading can give a thing a person's verb too: "What the checker cannot see".
+    for sentence in sentences(piece.text):
+        masked = piece.masked[sentence.offset : sentence.offset + len(sentence.text)]
+        found.extend(thing_verb_findings(piece, sentence, masked, rules))
     return found
 
 

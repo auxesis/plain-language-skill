@@ -281,10 +281,19 @@ ROUND_THREE_BLOCKED = [
     ("question-heading-items", "## Open questions\n\n### Billing\n\n1. The names of the summary checks that become required.\n"),
     ("whether-item", "## Facts I still need to check\n\n- Whether the RunsOn trial licence has an end date.\n"),
     ("whether-item", "- **Dependabot:** whether to group its updates.\n"),
+    # From the review of the first description of pull request 10: things given a person's
+    # verb, in headings as well as in sentences.
+    ("thing-given-person-verb", "## What the checker cannot see\n\nThe checker never checks code blocks.\n"),
+    ("thing-given-person-verb", "## How the checks behave on real text\n\nThe checks ran over 77 files.\n"),
+    ("thing-given-person-verb", "## Each review comment, and the change that answers it\n\nThe table lists them.\n"),
+    ("thing-given-person-verb", "The test cannot see the new file."),
 ]
 
 ROUND_THREE_ALLOWED = [
     "Now the stand-in for each test:",
+    "The reviewer answered each comment.",
+    "You can see the file in the pull request.",
+    "## Review comments and changes\n\nThe checker skips code blocks.\n",
     "Run `npm test` `--watch` again.",
     "## Questions for the next round\n\n- **Dependabot:** should updates be grouped?\n  In 20 days, 40 Dependabot branches cost $115.\n- **Weekly cost estimate:** where does it get posted?\n",
     "## Questions\n\n- Is the job done?\n\n## Next steps\n\n- Run the tests again.\n",
