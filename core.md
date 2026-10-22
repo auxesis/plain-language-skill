@@ -94,6 +94,7 @@ These rules come from the user and from GOV.UK, not from the ISO standards.
 - Use "must" for a rule, "need to" for a step, and "can" for a choice.
 - Put a comma after an opening "If" or "When" clause: "If you need it, tell me where to keep it."
 - Use the serial comma in a list of three or more: "words, headings, and links".
+- In a pull request description, an issue, or a comment on GitHub, write each paragraph on one line. GitHub shows every line break in that text.
 
 ## Check before you send
 
