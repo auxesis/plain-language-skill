@@ -173,6 +173,10 @@ Source: "Create a clear structure for your content". ISO 24495-1 5.2.2.
 - **Do not use footnotes.** They were made for print. Put important information in the text, and leave the rest out.
 - **Do not repeat the summary** in the first paragraph.
 
+This rule is house style, not GOV.UK:
+
+- **On GitHub, write each paragraph on one line.** In a pull request description, an issue, or a comment, GitHub shows each line break as a break on the page. A paragraph written one sentence per line then displays as a column of separate lines. A Markdown file in a repository is different. GitHub joins its lines into paragraphs, so one sentence per line is fine there.
+
 ## Headings
 
 Source: "Create a clear structure for your content" and "Headings". ISO 24495-1 5.2.3 and 5.2.4.
