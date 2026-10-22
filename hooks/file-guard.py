@@ -18,7 +18,7 @@ import sys
 HERE = os.path.dirname(os.path.realpath(__file__))
 # Claude Code runs this hook with "python3 -I", which leaves the script's own folder off
 # the import path, so it and the checker's folder are added here.
-sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "scripts")]
+sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "skills", "plain-language", "scripts")]
 
 from check import findings, format_finding, load_rules  # noqa: E402
 from shared import emit, parse_event, read_stdin, read_text, reason_for  # noqa: E402

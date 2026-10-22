@@ -1,8 +1,9 @@
 {
   "_comment": [
     "The rules the plain-language checker applies. One list, read by three things:",
-    "scripts/check.py on the command line, hooks/stop-guard.py for chat replies, and",
-    "hooks/file-guard.py for prose files. Add a rule here and all three apply it.",
+    "scripts/check.py on the command line, and two hooks in the plugin's hooks folder:",
+    "stop-guard.py for chat replies, and file-guard.py for prose files. Add a rule here",
+    "and all three apply it.",
     "",
     "Each rule names the clause it serves: '1' is ISO 24495-1:2023 and '3' is",
     "ISO 24495-3:2026. 'House style' rules come from the user, not from either standard.",

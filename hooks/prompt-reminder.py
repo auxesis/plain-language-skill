@@ -9,13 +9,13 @@ import sys
 # the import path, so it is added here.
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 
-from shared import emit  # noqa: E402
+from shared import CORE, emit  # noqa: E402
 
 emit(
     {
         "hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
-            "additionalContext": "Plain language is on (ISO 24495-1; full rules in ~/.claude/skills/plain-language/core.md). Answer first. Write literally: no metaphor, idiom, cliché or symbol shorthand. Use complete sentences of 25 words or fewer, one idea each. Write negatives in full. Say how you know each claim.",
+            "additionalContext": f"Plain language is on (ISO 24495-1; full rules in {CORE}). Answer first. Write literally: no metaphor, idiom, cliché or symbol shorthand. Use complete sentences of 25 words or fewer, one idea each. Write negatives in full. Say how you know each claim.",
         },
     }
 )

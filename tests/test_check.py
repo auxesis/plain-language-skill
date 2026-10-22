@@ -1,4 +1,4 @@
-# Run with: python3 -m unittest, from the skill folder.
+# Run with: python3 -m unittest, from the root of the repository.
 import json
 import os
 import re
@@ -8,8 +8,9 @@ import tempfile
 import unittest
 import warnings
 
-SKILL = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-sys.path[:0] = [os.path.join(SKILL, "scripts"), os.path.join(SKILL, "hooks")]
+ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+SKILL = os.path.join(ROOT, "skills", "plain-language")
+sys.path[:0] = [os.path.join(SKILL, "scripts"), os.path.join(ROOT, "hooks")]
 
 from check import findings, load_rules  # noqa: E402
 from prose import count_words, prose_units, sentences  # noqa: E402
@@ -344,12 +345,12 @@ def entry(type, content, **extra):
 
 
 def run_hook(name, event, cwd=None, env=None):
-    return run([os.path.join(SKILL, "hooks", name)], json.dumps(event), cwd=cwd, env=env)
+    return run([os.path.join(ROOT, "hooks", name)], json.dumps(event), cwd=cwd, env=env)
 
 
 def readme_hook_commands():
     """Each (event, command) pair in the hooks JSON of the README's install steps."""
-    with open(os.path.join(SKILL, "README.md"), encoding="utf-8") as handle:
+    with open(os.path.join(ROOT, "README.md"), encoding="utf-8") as handle:
         block = re.search(r"```json\n(.*?)```", handle.read(), re.DOTALL).group(1)
     hooks = json.loads(block)["hooks"]
     return [(event, hook["command"]) for event, entries in hooks.items() for entry in entries for hook in entry["hooks"]]

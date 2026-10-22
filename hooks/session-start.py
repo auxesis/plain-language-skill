@@ -13,9 +13,7 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 # the import path, so it is added here.
 sys.path.insert(0, HERE)
 
-from shared import emit, parse_event, read_stdin, read_text  # noqa: E402
-
-CORE = os.path.join(os.path.dirname(HERE), "core.md")
+from shared import CORE, emit, parse_event, read_stdin, read_text  # noqa: E402
 
 
 def main():
