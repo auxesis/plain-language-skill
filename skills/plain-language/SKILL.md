@@ -101,7 +101,7 @@ These points need more judgement than core.md gives:
 Run the checker on every prose file you wrote:
 
 ```
-python3 ~/.claude/skills/plain-language/scripts/check.py path/to/file.md
+python3 "${CLAUDE_SKILL_DIR}/scripts/check.py" path/to/file.md
 ```
 
 For text that is not in a file, pipe it in and add `--chat`.

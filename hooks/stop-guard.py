@@ -7,7 +7,8 @@
 # transcript alone is not enough: when the hook runs, the final reply has often not
 # been written to the file yet, so a hook that reads only the transcript misses it.
 # That was measured on 21 October 2026 with Claude Code 2.1.306. Text inside code
-# blocks, inline code and double quotation marks is not checked (see scripts/prose.py).
+# blocks, inline code and double quotation marks is not checked (see
+# skills/plain-language/scripts/prose.py).
 #
 # Input is the Stop hook's JSON on stdin:
 # { transcript_path, last_assistant_message, stop_hook_active }.
@@ -22,10 +23,10 @@ import sys
 HERE = os.path.dirname(os.path.realpath(__file__))
 # Claude Code runs this hook with "python3 -I", which leaves the script's own folder off
 # the import path, so it and the checker's folder are added here.
-sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "scripts")]
+sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "skills", "plain-language", "scripts")]
 
 from check import findings, format_finding, load_rules  # noqa: E402
-from shared import emit, parse_event, read_stdin, reason_for, truthy  # noqa: E402
+from shared import emit, hooks_off, parse_event, read_stdin, reason_for, truthy  # noqa: E402
 from transcript import tail, turn_text  # noqa: E402
 
 
@@ -40,6 +41,9 @@ def earlier_text(transcript_path):
 
 
 def main():
+    if hooks_off():
+        return 0
+
     event = parse_event(read_stdin())
     if truthy(event.get("stop_hook_active")):
         return 0
