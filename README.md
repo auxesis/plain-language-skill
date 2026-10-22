@@ -147,11 +147,10 @@ node scripts/check.mjs path/to/file.md
 
 ## Run the tests
 
-From the skill folder, run `mise run test`.
-Without mise, run this command:
+From the skill folder, run this command:
 
 ```
-node --test tests/*.test.mjs
+mise run test
 ```
 
 ## How reviews work
