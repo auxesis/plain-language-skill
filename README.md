@@ -9,9 +9,13 @@ You ask Claude:
 
 > I'm not a developer. My app shows this error: `connect ECONNREFUSED 127.0.0.1:5432`. In two sentences, what does it mean? <!-- plain-language-allow -->
 
-| Without the skill | With the skill |
-|---|---|
-| Your app tried to connect to its database (PostgreSQL, which uses port 5432) on the same computer it's running on, and nothing answered. Usually the database isn't running or hasn't finished starting, so starting or restarting it typically fixes the error, though sometimes the app is just pointed at the wrong address. | Your app could not connect to the database on the same computer. This usually means the database is not running, or the app's settings point to the wrong place. <!-- plain-language-allow --> |
+Without the skill, Claude replies:
+
+> Your app tried to connect to its database (PostgreSQL, which uses port 5432) on the same computer it's running on, and nothing answered. Usually the database isn't running or hasn't finished starting, so starting or restarting it typically fixes the error, though sometimes the app is just pointed at the wrong address. <!-- plain-language-allow -->
+
+With the skill, Claude replies:
+
+> Your app could not connect to the database on the same computer. This usually means the database is not running, or the app's settings point to the wrong place.
 
 Both replies are from Claude Opus 5.5, on 22 October 2026.
 
