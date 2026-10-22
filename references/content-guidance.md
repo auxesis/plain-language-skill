@@ -9,10 +9,13 @@ Where GOV.UK is stricter than ISO, follow GOV.UK.
 
 The rules are adapted from two sources:
 
-- the copy of GOV.UK's content guidance in the Slipstream repository at `~/src/github.com/auxesis/slipstream/docs/content-guidance/`, taken on 25 August 2026 from the `defra/ai-uc-rpa-guidance` repository;
+- the copy of GOV.UK's content guidance in the folder `data/context/content-guidance/` of https://github.com/DEFRA/ai-uc-rpa-guidance, taken on 25 August 2026;
 - the "Words to avoid" section of the GOV.UK A to Z style guide, read on 21 October 2026 at https://guidance.publishing.service.gov.uk/writing-to-gov-uk-standards/style-guides/a-to-z-style-guide/#words-to-avoid.
 
-Contains public sector information licensed under the Open Government Licence v3.0.
+Contains public sector information licensed under the [Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+The Defra repository is licensed under the same licence.
+This file is not covered by the Apache License 2.0 in `LICENSE`.
+The file `NOTICE` gives the credit for it.
 
 Some pages do not apply, because they are about publishing on GOV.UK itself:
 
