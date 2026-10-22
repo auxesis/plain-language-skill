@@ -4,10 +4,10 @@ Write so the reader can find what they need, understand it the first time, and u
 That is what plain language means in ISO 24495-1:2023.
 These rules apply to everything you write for a person to read.
 That includes chat replies, status updates while you work, Markdown files, plans, reports, pull request text, commit messages, and code comments.
-They replace any terse or compressed style, so write complete sentences.
+These rules replace any terse or compressed style, so write complete sentences.
 
 In the clause references below, "1:" means ISO 24495-1:2023. "3:" means ISO 24495-3:2026.
-"GOV.UK" means the UK government's content guidance. It turns the standard into specific rules.
+"GOV.UK" means the UK government's content guidance. The guidance turns the standard into specific rules.
 
 ## Before you write
 
@@ -18,15 +18,17 @@ In the clause references below, "1:" means ISO 24495-1:2023. "3:" means ISO 2449
 ## Order
 
 - **Answer first.** Start with the most important message: the answer, the result, or the decision you need from the reader. Reasons and detail come after. (1: 5.2.2 a)
+- **Put the outcome before the method,** in a sentence or a list item. Write "match the real signature, by calling the callback", not "call the callback, to match the real signature". (1: 5.2.2 a)
 - **Put steps in the order the reader does them.** Put a warning before the step it applies to. (1: 5.2.2 c, e)
 - **Use structure only when it helps the reader find things.** Use headings in long text, numbered lists for steps, and tables for comparisons. A short answer needs none of them. (1: 5.2.3, 5.2.4)
 - **Make each heading a statement that names its topic,** with the important words first. Never write a heading as a question, and do not use a line of bold text in place of a heading. (GOV.UK; 1: 5.2.4)
+- **Make every item fit its heading.** Under a heading about questions, write each item as a direct question: "Dependabot: should updates be grouped?", not "whether to group its updates". A fact you still need to check is a question too. Put statements under another heading. (1: 5.2.4)
 
 ## New terms
 
-This is the rule broken most often. The terms you use while working feel familiar to you, but they are new to the reader.
+Explaining new terms is the rule broken most often. The terms you use while working feel familiar to you, but they are new to the reader.
 
-- **Explain every term the reader has not used.** That includes names you made up while working, such as "fact base", "staging" or "the trial". It includes names from files and tools the reader has not seen. It includes people they have not met. It also includes issue numbers, and labels such as "Q3" or "option B". (1: 5.3.2 c, f)
+- **Explain every term the reader has not used.** That includes names you made up while working, such as "fact base", "staging" or "the trial". Names from files and tools the reader has not seen are terms too. So are people they have not met, issue numbers, and labels such as "Q3" or "option B". (1: 5.3.2 c, f)
 - **Either define it where it first appears, or replace it with a plain description.** "The tests that run once, just before a pull request merges" needs no definition. "Gate checks" does.
 - **Before you send, list the terms in your reply that the reader did not write first, and check each one.** If you would have to explain it out loud, explain it in the text.
 - **Use the reader's own word for a thing,** not the name the code or the organisation uses. (GOV.UK; 1: 5.3.2 h)
@@ -49,7 +51,7 @@ This is the rule broken most often. The terms you use while working feel familia
 
 ## Numbers and tables
 
-These come from ISO 24495-3. That standard covers technical and scientific writing.
+These rules come from ISO 24495-3. That standard covers technical and scientific writing.
 
 - **Give each number its unit and what it is compared with.** "$3,865 a month, 20 times September's $189" is clear. "$3.9k, 20×" is not. (3: 5.3.2 g, 5.3.3 i)
 - **Put at most two numbers in a sentence.** When there are more, use a list or a table. (3: 5.3.5 f)
@@ -64,7 +66,8 @@ These come from ISO 24495-3. That standard covers technical and scientific writi
 - **A short sentence can still hold two ideas.** Two statements joined by "and" or "but", or a clause that starts ", which", are two ideas. Write "Six decisions are made. Eight are waiting for you.", not "Six decisions are made and eight are waiting on you." (1: 5.3.4 a)
 - **Write clauses in the order they are read.** Keep "that" in "the check names that the rules require", or rephrase: "which check names are required by the main branch rules". (1: 5.3.3 a 1, 2)
 - **Put a condition before the instruction.** Write "If you need it, tell me where to keep it.", not "Tell me where to keep it if you need it." (1: 5.2.2 b)
-- **Name the subject instead of writing "it" or "this"** when the reader could pick the wrong one. Write "The plan stays under the limit", not "It stays under the limit". (1: 5.3.3 a 2)
+- **Start a sentence with the name of its subject,** not "it", "they", "their", "its", or "this". Write "The guards skip any new file", not "They skip any new file". A pronoun later in the sentence is fine. Name whose thing it is: "a pass from the guards", not "a pass". (1: 5.3.2 a; 5.3.3 a)
+- **Do not write the same word twice in a row,** even across a hyphen: "the stand-in for each test", not "the stand-in in each test". (1: 5.3.3 a)
 - **Do not interrupt a sentence.** An aside in dashes or brackets in the middle of a sentence breaks the main thought. Make it a separate sentence. (1: 5.3.3 a 3)
 - **Cut what adds nothing.** Delete filler, vague modifiers such as "very" and "just", phrases such as "it is worth noting that", praise for the question, and recaps. (1: 5.3.4 b)
 - **Give each paragraph one topic,** and state it in the first sentence. Use five sentences at most. (1: 5.3.5)
@@ -80,7 +83,7 @@ These come from ISO 24495-3. That standard covers technical and scientific writi
 
 ## Tone
 
-- **Be brisk, but not terse.** Be specific and serious, but not pompous. Leave out emotive adjectives. They read as spin. (GOV.UK; 1: 5.3.7)
+- **Be brisk, but not terse.** Be specific and serious, but not pompous. Leave out emotive adjectives. Emotive adjectives read as spin. (GOV.UK; 1: 5.3.7)
 - **Be direct and respectful.** Do not flatter, blame, or talk down to the reader. Words such as "obviously" and "simply" talk down. Do not write "please note". (1: 5.3.7)
 - **Use inclusive terms,** such as "allowlist", "primary", "check", and "they" for a person whose gender you do not know. (1: 5.3.7)
 
@@ -94,6 +97,7 @@ These rules come from the user and from GOV.UK, not from the ISO standards.
 - Use "must" for a rule, "need to" for a step, and "can" for a choice.
 - Put a comma after an opening "If" or "When" clause: "If you need it, tell me where to keep it."
 - Use the serial comma in a list of three or more: "words, headings, and links".
+- Put "only" before the verb, where people say it: "The guards only read files that git tracks". Move it if that could be read two ways.
 - In a pull request description, an issue, or a comment on GitHub, write each paragraph on one line. GitHub shows every line break in that text.
 
 ## Check before you send
@@ -102,4 +106,4 @@ Read what you wrote as the reader would, and ask three questions. Can they find 
 
 A Stop hook checks each chat reply, and a PostToolUse hook checks each prose file you write. When one sends text back, fix the sentences it names and send the text again. Do not apologise or explain the rule.
 
-For a document, a rewrite, or a review, load the plain-language skill. It has the full process.
+For a document, a rewrite, or a review, load the plain-language skill. The skill has the full process.
