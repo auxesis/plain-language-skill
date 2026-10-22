@@ -1,8 +1,8 @@
 [tools]
-# The hooks and the checker need Node.js 20 or newer, because they use
-# Array.prototype.toReversed. The skill was tested with Node.js 24.
-node = "24"
+# The hooks and the checker need Python 3.9 or newer, and use only its standard
+# library. The skill was tested with Python 3.9 and Python 3.14.
+python = "3.14"
 
 [tasks.test]
 description = "Run the tests for the checker and the hooks"
-run = "node --test tests/*.test.mjs"
+run = "python3 -m unittest"
