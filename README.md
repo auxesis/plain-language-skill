@@ -167,7 +167,7 @@ From the skill folder, run this command:
 mise run test
 ```
 
-GitHub Actions also runs the tests on Linux and macOS for every pull request.
+GitHub Actions also runs the tests on Linux for every pull request.
 
 ## How reviews work
 
