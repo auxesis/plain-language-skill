@@ -256,7 +256,7 @@ GOV.UK content has to meet the Web Content Accessibility Guidelines 2.2, level A
 
 ## What the checker enforces
 
-`scripts/check.mjs` reports these GOV.UK rules as "must fix":
+`scripts/check.py` reports these GOV.UK rules as "must fix":
 
 - the words to avoid that rarely have a literal use in software writing;
 - "e.g.", "i.e." and "etc.";

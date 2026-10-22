@@ -101,7 +101,7 @@ These points need more judgement than core.md gives:
 Run the checker on every prose file you wrote:
 
 ```
-node ~/.claude/skills/plain-language/scripts/check.mjs path/to/file.md
+python3 ~/.claude/skills/plain-language/scripts/check.py path/to/file.md
 ```
 
 For text that is not in a file, pipe it in and add `--chat`.
@@ -132,7 +132,7 @@ For a document that people will use for a long time, suggest when to review it (
 
 ## The checker and the hooks
 
-`scripts/check.mjs` and two hooks read one list of rules, `scripts/rules.json`.
+`scripts/check.py` and two hooks read one list of rules, `scripts/rules.json`.
 The Stop hook checks each chat reply, and the PostToolUse hook checks each Markdown or text file Claude writes.
 Each sends the text back when it finds a "must fix" problem.
 

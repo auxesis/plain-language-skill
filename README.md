@@ -27,9 +27,10 @@ With the skill, Claude replies:
 
 ## Install
 
-You need Claude Code, git, and Node.js 20 or later.
-The hooks and the checker are written in JavaScript, so they need Node.js.
-The skill has been tested on Linux, with Claude Code 2.1.306 and Node.js 24.
+You need Claude Code, git, and Python 3.9 or later.
+The hooks and the checker are written in Python.
+They use only the modules that come with Python, so you do not need to install any packages.
+The skill has been tested on Linux only, with Claude Code 2.1.306, Python 3.9.25, and Python 3.14.4.
 
 1. Clone this repository into your Claude Code skills folder.
    The folder must be named `plain-language`, because the hooks use that path.
@@ -38,24 +39,16 @@ The skill has been tested on Linux, with Claude Code 2.1.306 and Node.js 24.
    git clone https://github.com/auxesis/plain-language-skill.git ~/.claude/skills/plain-language
    ```
 
-2. Install Node.js, if you do not have version 20 or later.
-   If you use [mise](https://mise.jdx.dev/), the file `mise.toml` in this repository names the version to install:
+2. Check that you have Python 3.9 or later:
 
    ```
-   cd ~/.claude/skills/plain-language
-   mise install
+   python3 --version
    ```
 
-   If mise asks you to trust the file, run `mise trust`.
-   The version applies only inside the skill folder.
-   The hooks run in the folder of the project you have open, so they need Node.js there too.
-   To install Node.js 24 for every folder, run this command:
-
-   ```
-   mise use --global node@24
-   ```
-
-   Without mise, install Node.js in any way you choose.
+   Most Linux distributions include Python 3.
+   On macOS, Python 3 comes with Apple's command line tools.
+   If you do not have them, macOS offers to install them when you run `python3`.
+   If you have no Python 3, or a version older than 3.9, install Python from [python.org](https://www.python.org/downloads/) or with your package manager.
 
 3. Add the hooks to `~/.claude/settings.json`.
    If the file has no `hooks` key, add the `hooks` key below to the top level of the file.
@@ -66,25 +59,34 @@ The skill has been tested on Linux, with Claude Code 2.1.306 and Node.js 24.
    {
      "hooks": {
        "SessionStart": [
-         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v node >/dev/null 2>&1 || exit 0; node \"$HOME/.claude/skills/plain-language/hooks/session-start.mjs\"" }] }
+         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/session-start.py\" || exit 1" }] }
        ],
        "SubagentStart": [
-         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v node >/dev/null 2>&1 || exit 0; node \"$HOME/.claude/skills/plain-language/hooks/session-start.mjs\"" }] }
+         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/session-start.py\" || exit 1" }] }
        ],
        "UserPromptSubmit": [
-         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v node >/dev/null 2>&1 || exit 0; node \"$HOME/.claude/skills/plain-language/hooks/prompt-reminder.mjs\"" }] }
+         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/prompt-reminder.py\" || exit 1" }] }
        ],
        "Stop": [
-         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v node >/dev/null 2>&1 || exit 0; node \"$HOME/.claude/skills/plain-language/hooks/stop-guard.mjs\"" }] }
+         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/stop-guard.py\" || exit 1" }] }
        ],
        "PostToolUse": [
-         { "matcher": "Write|Edit|MultiEdit", "hooks": [{ "type": "command", "timeout": 30, "command": "command -v node >/dev/null 2>&1 || exit 0; node \"$HOME/.claude/skills/plain-language/hooks/file-guard.mjs\"" }] }
+         { "matcher": "Write|Edit|MultiEdit", "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/file-guard.py\" || exit 1" }] }
        ]
      }
    }
    ```
 
-   If Node.js is not installed, each hook exits without doing anything.
+   If Python 3 is not installed, each hook exits without doing anything.
+   The hooks run in the folder of the project you have open.
+   The `-I` option stops that project from changing what the hooks run.
+   With it, Python does not load code from the project folder.
+   It also ignores packages installed in your home folder, and any environment variable whose name starts with `PYTHON`.
+
+   Each command ends with `|| exit 1`.
+   If a hook's file is missing, Python exits with code 2.
+   Claude Code treats exit code 2 as an instruction to block, so the prompt hook would block every message you send.
+   `|| exit 1` changes the code to 1, so Claude Code reports an error and does not block anything.
 
 4. Turn off any plugin or setting that tells Claude to write in a terse style, such as the caveman plugin.
    Its instructions conflict with the rules in this skill.
@@ -96,7 +98,7 @@ The skill has been tested on Linux, with Claude Code 2.1.306 and Node.js 24.
 To check that the checker works, run this command:
 
 ```
-echo "We will leverage this." | node ~/.claude/skills/plain-language/scripts/check.mjs --chat
+echo "We will leverage this." | python3 ~/.claude/skills/plain-language/scripts/check.py --chat
 ```
 
 The checker reports that "leverage" must be fixed.
@@ -117,6 +119,16 @@ git -C ~/.claude/skills/plain-language pull
 
 The checks use the new version straight away.
 The core rules change at the start of the next session.
+
+### Update from the JavaScript version
+
+Earlier versions of this skill were written in JavaScript, and their hook commands run `node`.
+If your hook commands run `node`, follow these steps in this order:
+
+1. Pull the new version, with the command above.
+   Until you finish step 2, each old hook reports an error, because its file is gone.
+2. In `~/.claude/settings.json`, replace your five hook entries with the entries in step 3 of the install steps.
+3. Start a new Claude Code session.
 
 ## Remove
 
@@ -145,7 +157,7 @@ The checker never checks code blocks, inline code, URLs, or text in double quota
 | `SKILL.md` | The process for documents, rewrites, and reviews |
 | `references/guidelines.md` | Every guideline in both ISO standards, in our own words |
 | `references/content-guidance.md` | The GOV.UK rules, including the words to avoid |
-| `scripts/check.mjs` | The checker that the hooks use |
+| `scripts/check.py` | The checker that the hooks use |
 | `scripts/rules.json` | The list of rules the checker applies |
 | `hooks/` | The four hooks |
 | `tests/` | Tests for the checker and the hooks |
@@ -156,7 +168,7 @@ The checker never checks code blocks, inline code, URLs, or text in double quota
 From the skill folder, run:
 
 ```
-node scripts/check.mjs path/to/file.md
+python3 scripts/check.py path/to/file.md
 ```
 
 ## Run the tests
@@ -165,6 +177,14 @@ From the skill folder, run this command:
 
 ```
 mise run test
+```
+
+If mise asks you to trust `mise.toml`, run `mise trust`.
+The `test` task runs `python3 -m unittest` with the Python version that `mise.toml` names.
+To run the tests with Python 3.9, the oldest version the skill supports, run this command:
+
+```
+mise exec python@3.9 -- python3 -m unittest
 ```
 
 GitHub Actions also runs the tests on Linux for every pull request.

@@ -1,8 +1,8 @@
 {
   "_comment": [
     "The rules the plain-language checker applies. One list, read by three things:",
-    "scripts/check.mjs on the command line, hooks/stop-guard.mjs for chat replies, and",
-    "hooks/file-guard.mjs for prose files. Add a rule here and all three apply it.",
+    "scripts/check.py on the command line, hooks/stop-guard.py for chat replies, and",
+    "hooks/file-guard.py for prose files. Add a rule here and all three apply it.",
     "",
     "Each rule names the clause it serves: '1' is ISO 24495-1:2023 and '3' is",
     "ISO 24495-3:2026. 'House style' rules come from the user, not from either standard.",
@@ -13,7 +13,9 @@
     "",
     "Patterns are JavaScript regular expressions, matched case-insensitively unless a",
     "rule sets 'flags'. They run on prose only: code blocks, inline code, URLs and text",
-    "inside double quotation marks are removed first."
+    "inside double quotation marks are removed first. The Python checker reads them the",
+    "same way, except for \\p{Extended_Pictographic}, which it replaces with a list of",
+    "code points."
   ],
   "limits": {
     "sentenceWords": 25,
