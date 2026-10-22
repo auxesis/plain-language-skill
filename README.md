@@ -141,8 +141,17 @@ Once the feedback is applied, the pull request is closed without merging.
 
 ## Licences
 
-The two ISO standards are licensed to one user, and the licence prohibits copying.
+This repository is licensed under the Apache License 2.0, in `LICENSE`.
+The material adapted from the GOV.UK content guidance is an exception.
+It stays under the Open Government Licence v3.0.
+That material is in `references/content-guidance.md`.
+It is also in the rules `govuk-words-to-avoid` and `govuk-tone` in `scripts/rules.json`.
+
+The file `NOTICE` credits the GOV.UK material.
+If you share this repository or a work based on it, you must keep that credit.
+
+Contains public sector information licensed under the [Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+
+The two ISO standards are licensed to one user, and their licence prohibits copying.
 This repository states their guidelines in our own words and cites the clause numbers.
 It never copies the text of the standards.
-
-The GOV.UK guidance is used under the Open Government Licence v3.0.
