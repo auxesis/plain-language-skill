@@ -7,15 +7,15 @@ It follows ISO 24495-1:2023, ISO 24495-3:2026, and the GOV.UK content guidance.
 
 You ask Claude:
 
-> I'm not a developer. My app shows this error: `connect ECONNREFUSED 127.0.0.1:5432`. In two sentences, what does it mean? <!-- plain-language-allow -->
+> Our GitHub Actions bill went from $189 in September to $3,865 in October. Pull requests went from 40 to 290. In two sentences, what happened?
 
 Without the skill, Claude replies:
 
-> Your app tried to connect to its database (PostgreSQL, which uses port 5432) on the same computer it's running on, and nothing answered. Usually the database isn't running or hasn't finished starting, so starting or restarting it typically fixes the error, though sometimes the app is just pointed at the wrong address. <!-- plain-language-allow -->
+> PRs rose about 7x (40 → 290), but the bill rose about 20x, so the average cost per PR also nearly tripled, from about $4.73 to about $13.33. Volume explains only part of the increase; each PR is also using more or pricier CI, possibly from more pushes per PR (common with bots or AI agents that keep iterating), larger test matrices, bigger or macOS runners, or longer jobs, and plan minutes that were free in September would make the jump look even steeper. <!-- plain-language-allow -->
 
 With the skill, Claude replies:
 
-> Your app could not connect to the database on the same computer. This usually means the database is not running, or the app's settings point to the wrong place.
+> Pull requests rose to 7 times September's number, but the bill rose to 20 times, so more pull requests explain only part of the increase. The rest came from each pull request costing more on average, $13.30 compared with $4.70 in September, and your figures do not show why.
 
 ## What runs, and when
 
