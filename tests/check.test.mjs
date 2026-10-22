@@ -1,7 +1,7 @@
 // Run with: node --test ~/.claude/skills/plain-language/tests/*.test.mjs
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
@@ -227,6 +227,8 @@ describe("rules from the user's review of round two", () => {
     assert.deepEqual(blocking("Eight test inputs, run before and after the change.", "chat"), []);
     assert.deepEqual(blocking("I checked the page, before and after the change.", "chat"), []);
     assert.ok(!blocking("The report, written last week and sent today, lists the results.", "chat").includes("serial-comma"));
+    assert.deepEqual(blocking("For the run without the skill, all hooks and skills were turned off.", "chat"), []);
+    assert.ok(blocking("For the test, it covers words, headings and links.", "chat").includes("serial-comma"));
   });
 });
 
@@ -272,6 +274,15 @@ describe("the command line", () => {
     assert.equal(bad.status, 1);
     const good = spawnSync("node", [cli, "--chat"], { input: "We did it to test it." });
     assert.equal(good.status, 0);
+  });
+
+  it("runs when it is reached through a symlink", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "plain-language-"));
+    const link = path.join(dir, "check.mjs");
+    symlinkSync(cli, link);
+    const bad = spawnSync("node", [link, "--chat"], { input: "We did it in order to test it.", encoding: "utf8" });
+    assert.equal(bad.status, 1);
+    assert.match(bad.stdout, /must fix/);
   });
 
   it("passes its own skill files", () => {
@@ -371,6 +382,13 @@ describe("the hooks", () => {
     const off = path.join(dir, "rules.md");
     writeFileSync(off, "<!-- plain-language-check: off -->\nin order to\n");
     assert.equal(runHook("file-guard.mjs", { tool_name: "Write", tool_input: { file_path: off } }).stdout, "");
+  });
+
+  it("the file hook still checks a file that only mentions the marker in a sentence", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "plain-language-"));
+    const readme = path.join(dir, "README.md");
+    writeFileSync(readme, "To skip a file, put `plain-language-check: off` on a line of its own.\n\nWe did it in order to test it.\n");
+    assert.match(runHook("file-guard.mjs", { tool_name: "Write", tool_input: { file_path: readme } }).stdout, /"decision":"block"/);
   });
 
   it("the session hook adds core.md, for a session and for a subagent", () => {

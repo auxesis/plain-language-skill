@@ -3,6 +3,20 @@
 This skill makes Claude Code write in plain language.
 It follows ISO 24495-1:2023, ISO 24495-3:2026, and the GOV.UK content guidance.
 
+## Example
+
+You ask Claude:
+
+> Our GitHub Actions bill went from $189 in September to $3,865 in October. Pull requests went from 40 to 290. In two sentences, what happened?
+
+Without the skill, Claude replies:
+
+> PRs rose about 7x (40 → 290), but the bill rose about 20x, so the average cost per PR also nearly tripled, from about $4.73 to about $13.33. Volume explains only part of the increase; each PR is also using more or pricier CI, possibly from more pushes per PR (common with bots or AI agents that keep iterating), larger test matrices, bigger or macOS runners, or longer jobs, and plan minutes that were free in September would make the jump look even steeper. <!-- plain-language-allow -->
+
+With the skill, Claude replies:
+
+> Pull requests rose to 7 times September's number, but the bill rose to 20 times, so more pull requests explain only part of the increase. The rest came from each pull request costing more on average, $13.30 compared with $4.70 in September, and your figures do not show why.
+
 ## What runs, and when
 
 - **Every session and subagent:** a hook adds the core rules in `core.md` to the context.
@@ -100,7 +114,7 @@ The core rules change at the start of the next session.
 ## Skip a check
 
 - **Skip one line:** put `plain-language-allow` on the line. In Markdown, write it in a comment: `<!-- plain-language-allow -->`.
-- **Skip a whole file:** put `plain-language-check: off` anywhere in the file. The file hook then does not check it.
+- **Skip a whole file:** put `<!-- plain-language-check: off -->` in the file, on a line of its own. The file hook then does not check the file. The marker does not work inside a sentence.
 
 The checker never checks code blocks, inline code, URLs, or text in double quotation marks.
 
