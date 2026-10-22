@@ -251,14 +251,32 @@ The checker is in `skills/plain-language/scripts/check.py` inside that version's
 
 ## Local development
 
-To load the plugin from your clone for one session, start Claude Code with the `--plugin-dir` option:
+Install the plugin from GitHub, as in the install steps.
+To work on a change, start Claude Code with the `--plugin-dir` option and the path to your clone:
 
 ```
 claude --plugin-dir path/to/plain-language-skill
 ```
 
-For that session, the plugin in your clone replaces the installed plugin.
-After you change a file, type `/reload-plugins` or start a new session.
+For that session, Claude Code loads the plugin from your clone instead of the installed copy.
+Sessions that you start without `--plugin-dir` still use the installed copy.
+
+After you change `hooks/hooks.json` or the skill, type `/reload-plugins`.
+Claude Code then reads the plugin from your clone again.
+A change to a Python file takes effect the next time its hook runs, because each hook starts Python again.
+
+To compare with a session that has no part of the plugin, turn the plugin off for one session:
+
+```
+claude --settings '{"enabledPlugins": {"plain-language@plain-language-skill": false}}'
+```
+
+A value that you pass with `--settings` takes priority over your settings files, for that session only.
+To turn off only the hooks, use `PLAIN_LANGUAGE_HOOKS=false`, as "Skip a check" describes.
+
+Do not add your clone as a second marketplace.
+The clone's marketplace has the same name as the one on GitHub, `plain-language-skill`.
+Claude Code allows only one marketplace with each name.
 
 To check the plugin files, run these commands from the root of the repository:
 
