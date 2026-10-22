@@ -667,11 +667,22 @@ def source_findings(markdown, rules):
     return found
 
 
+# Python's \s and strip() count U+0085 and U+001C to U+001F as white space, but they are
+# control characters, so here they become U+007F, which is not white space. They also
+# leave out U+FEFF, which a file saved with a byte order mark starts with. It becomes
+# U+205F, a space character that no rule names, so the first line can still be a
+# heading. A plain space would not do, because some rules match a literal space.
+# JavaScript reads all six characters this way. Each replacement is one character, so
+# offsets and line numbers do not change.
+WHITE_SPACE = str.maketrans({"﻿": " ", "\x85": "\x7f", "\x1c": "\x7f", "\x1d": "\x7f", "\x1e": "\x7f", "\x1f": "\x7f"})
+
+
 def findings(markdown, rules=None, mode="file"):
     """Every finding for one Markdown text, in line order. `mode` is "file" or "chat"; a
     chat reply is too short for the rhythm check to mean anything."""
     if rules is None:
         rules = load_rules()
+    markdown = markdown.translate(WHITE_SPACE)
     pieces = prose_units(markdown)
     found = [*source_findings(markdown, rules), *structure_findings(markdown), *abbreviation_findings(pieces, rules)]
     for piece in pieces:

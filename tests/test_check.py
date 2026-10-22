@@ -302,6 +302,10 @@ class StructureRules(unittest.TestCase):
     def test_reports_the_same_link_text_going_to_two_places(self):
         self.assertIn("link-text-reused", ids("See [the guide](a.md) and [the guide](b.md)."))
 
+    # New in the Python version. Python's \s does not match U+FEFF, the byte order mark.
+    def test_reads_the_first_line_of_a_file_with_a_byte_order_mark_as_a_heading(self):
+        self.assertIn("heading-is-a-question", blocking("﻿## Which members have no unit?\n\nText."))
+
 
 CLI = os.path.join(SKILL, "scripts", "check.py")
 
