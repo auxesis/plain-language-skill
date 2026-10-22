@@ -129,6 +129,7 @@ Do not replace the hook entries before you pull.
 If a new hook's file is missing, Python exits with code 2.
 Claude Code treats exit code 2 as an instruction to block.
 For the prompt hook, that means Claude Code blocks every message you send.
+For the Stop hook, it means Claude cannot end its turn.
 
 ## Remove
 
