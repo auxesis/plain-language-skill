@@ -187,6 +187,8 @@ To run the tests with Python 3.9, the oldest version the skill supports, run thi
 mise exec python@3.9 -- python3 -m unittest
 ```
 
+GitHub Actions also runs the tests on Linux for every pull request.
+
 ## How reviews work
 
 Each review round is a pull request that adds a `reviews/round-N/` folder.
