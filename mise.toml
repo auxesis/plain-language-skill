@@ -1,0 +1,8 @@
+[tools]
+# The hooks and the checker need Node.js 20 or newer, because they use
+# Array.prototype.toReversed. The skill was tested with Node.js 24.
+node = "24"
+
+[tasks.test]
+description = "Run the tests for the checker and the hooks"
+run = "node --test tests/*.test.mjs"
