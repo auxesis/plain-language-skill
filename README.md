@@ -188,6 +188,21 @@ To turn it on, type `/plugin` in a session, open the **Marketplaces** tab, selec
 
 - **Skip one line:** put `plain-language-allow` on the line. In Markdown, write it in a comment: `<!-- plain-language-allow -->`.
 - **Skip a whole file:** put `<!-- plain-language-check: off -->` in the file, on a line of its own. The file hook then does not check the file. The marker does not work inside a sentence.
+- **Turn off the hooks for one session:** start Claude Code with the environment variable `PLAIN_LANGUAGE_HOOKS` set to `false`. Each hook then exits without doing anything.
+
+For example, this command starts a session without the hooks:
+
+```
+PLAIN_LANGUAGE_HOOKS=false claude
+```
+
+The skill still loads in that session when a task matches its description.
+
+The variable takes the values `true` and `false`.
+Upper or lower case does not matter.
+Spaces around the value do not matter either.
+Any other value, or no value, leaves the hooks on.
+The checker script ignores the variable.
 
 The checker never checks code blocks, inline code, URLs, or text in double quotation marks.
 

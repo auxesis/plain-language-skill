@@ -13,10 +13,13 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 # the import path, so it is added here.
 sys.path.insert(0, HERE)
 
-from shared import CORE, emit, parse_event, read_stdin, read_text  # noqa: E402
+from shared import CORE, emit, hooks_off, parse_event, read_stdin, read_text  # noqa: E402
 
 
 def main():
+    if hooks_off():
+        return 0
+
     try:
         event = parse_event(read_stdin())
     except Exception:

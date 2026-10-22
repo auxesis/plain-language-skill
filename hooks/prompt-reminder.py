@@ -9,7 +9,10 @@ import sys
 # the import path, so it is added here.
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 
-from shared import CORE, emit  # noqa: E402
+from shared import CORE, emit, hooks_off  # noqa: E402
+
+if hooks_off():
+    sys.exit(0)
 
 emit(
     {

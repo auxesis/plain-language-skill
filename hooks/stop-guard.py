@@ -26,7 +26,7 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "skills", "plain-language", "scripts")]
 
 from check import findings, format_finding, load_rules  # noqa: E402
-from shared import emit, parse_event, read_stdin, reason_for, truthy  # noqa: E402
+from shared import emit, hooks_off, parse_event, read_stdin, reason_for, truthy  # noqa: E402
 from transcript import tail, turn_text  # noqa: E402
 
 
@@ -41,6 +41,9 @@ def earlier_text(transcript_path):
 
 
 def main():
+    if hooks_off():
+        return 0
+
     event = parse_event(read_stdin())
     if truthy(event.get("stop_hook_active")):
         return 0

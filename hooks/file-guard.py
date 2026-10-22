@@ -21,7 +21,7 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "skills", "plain-language", "scripts")]
 
 from check import findings, format_finding, load_rules  # noqa: E402
-from shared import emit, parse_event, read_stdin, read_text, reason_for  # noqa: E402
+from shared import emit, hooks_off, parse_event, read_stdin, read_text, reason_for  # noqa: E402
 
 PROSE = {".md", ".mdx", ".markdown", ".txt", ".rst", ".adoc"}
 SKIPPED_DIRECTORIES = re.compile(r"[\\/](?:node_modules|\.git|vendor|dist|build)[\\/]")
@@ -60,6 +60,9 @@ def changed_ranges(file, new_texts):
 
 
 def main():
+    if hooks_off():
+        return 0
+
     event = parse_event(read_stdin())
     tool = event.get("tool_name")
     tool_input = event.get("tool_input")

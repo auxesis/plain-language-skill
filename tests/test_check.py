@@ -487,6 +487,49 @@ class TheHooks(unittest.TestCase):
                 self.assertTrue(os.path.isfile(path))
 
 
+def env_with(value):
+    """The environment with PLAIN_LANGUAGE_HOOKS set to `value`, or without it for None."""
+    env = {key: item for key, item in os.environ.items() if key != "PLAIN_LANGUAGE_HOOKS"}
+    if value is not None:
+        env["PLAIN_LANGUAGE_HOOKS"] = value
+    return env
+
+
+class TheSwitchThatTurnsOffTheHooks(unittest.TestCase):
+    def events(self):
+        """For each hook, an event that makes it print something when it is on."""
+        file = os.path.join(temporary_folder(self), "doc.md")
+        write(file, "We did it in order to test it.\n")
+        return {
+            "session-start.py": {"hook_event_name": "SessionStart"},
+            "prompt-reminder.py": {},
+            "stop-guard.py": {"last_assistant_message": "We did it in order to test it."},
+            "file-guard.py": {"tool_name": "Write", "tool_input": {"file_path": file}},
+        }
+
+    def test_every_hook_exits_with_0_and_prints_nothing_when_the_variable_is_false(self):
+        events = self.events()
+        for value in ("false", "FALSE", " false "):
+            for name, event in events.items():
+                with self.subTest(value=value, hook=name):
+                    result = run_hook(name, event, env=env_with(value))
+                    self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
+
+    def test_every_hook_runs_when_the_variable_is_true_or_unset_or_any_other_value(self):
+        events = self.events()
+        for value in ("true", None, "0"):
+            for name, event in events.items():
+                with self.subTest(value=value, hook=name):
+                    result = run_hook(name, event, env=env_with(value))
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertTrue(json.loads(result.stdout))
+
+    def test_the_checker_ignores_the_variable(self):
+        result = run([CLI, "--chat"], "We did it in order to test it.", env=env_with("false"))
+        self.assertEqual(result.returncode, 1)
+        self.assertRegex(result.stdout, "must fix")
+
+
 def plugin_hooks():
     """Each (event, matcher, hook) in the plugin's hooks/hooks.json."""
     with open(os.path.join(ROOT, "hooks", "hooks.json"), encoding="utf-8") as handle:
