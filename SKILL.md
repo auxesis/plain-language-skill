@@ -167,6 +167,6 @@ You need it in three cases: for the detail of one guideline, for a clause to cit
 Read it before you write a document with headings, links, lists, or tables, and when the checker names a GOV.UK rule.
 The GOV.UK guidance is licensed under the Open Government Licence v3.0. That licence allows reuse with credit.
 
-The licensed standards are at `~/ISO_24495-1_2023(en).pdf` and `~/ISO_24495-3_2026(en).pdf`.
-The licence is for one user and prohibits copying.
-Paraphrase them and cite the clause, and never paste their text into this skill or into anything you write.
+The licence for each ISO standard is for one user. It prohibits copying.
+If you have a copy, paraphrase it and cite the clause.
+Never paste its text into this skill or into anything you write.

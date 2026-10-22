@@ -7,7 +7,6 @@ This file restates every guideline in two standards, clause by clause:
 
 It paraphrases them and does not quote them.
 The licence for both standards is for one user. It prohibits copying, so do not paste their text here.
-The licensed copies are at `~/ISO_24495-1_2023(en).pdf` and `~/ISO_24495-3_2026(en).pdf`.
 
 Each section ends with notes on what the guideline means for Claude's writing, marked "For Claude".
 
