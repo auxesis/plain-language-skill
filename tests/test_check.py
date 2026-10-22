@@ -293,6 +293,9 @@ ROUND_THREE_ALLOWED = [
     "Now the stand-in for each test:",
     "The reviewer answered each comment.",
     "You can see the file in the pull request.",
+    "You can see the table below.",
+    # Database documentation says that a transaction sees data. The user allowed it.
+    "Under SERIALIZABLE, each transaction sees the data as it was when the transaction started.",
     "## Review comments and changes\n\nThe checker skips code blocks.\n",
     "Run `npm test` `--watch` again.",
     "## Questions for the next round\n\n- **Dependabot:** should updates be grouped?\n  In 20 days, 40 Dependabot branches cost $115.\n- **Weekly cost estimate:** where does it get posted?\n",

@@ -106,7 +106,7 @@ def load_rules(file=os.path.join(HERE, "rules.json")):
                 re.compile(rf"\b(?:{things})\s+{between}({tv['blockVerbs']})\b", re.IGNORECASE),
                 re.compile(rf"\b(?:{'|'.join(tv['pronouns'])})\s+{between}({tv['pronounVerbs']})\b", re.IGNORECASE),
             ],
-            "held": re.compile(rf"\b(?:{tv['blockVerbs']})\s+(?:{'|'.join(tv['heldThings'])})\b", re.IGNORECASE),
+            "held": re.compile(rf"\b(?:{tv['heldVerbs']})\s+(?:{'|'.join(tv['heldThings'])})\b", re.IGNORECASE),
             "thingSubject": re.compile(
                 rf"^\s*(?:(?:the|a|an|this|that|each|every|its|our|your|their|one|new)\s+)?(?:[\w-]+\s+){{0,2}}?(?:{things})\b",
                 re.IGNORECASE,
