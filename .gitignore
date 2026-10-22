@@ -1,0 +1,2 @@
+# Python writes compiled copies of the modules here when the hooks or the tests run.
+__pycache__/
