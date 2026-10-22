@@ -59,19 +59,19 @@ The skill has been tested on Linux only, with Claude Code 2.1.306, Python 3.9.25
    {
      "hooks": {
        "SessionStart": [
-         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/session-start.py\"" }] }
+         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/session-start.py\" || exit 1" }] }
        ],
        "SubagentStart": [
-         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/session-start.py\"" }] }
+         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/session-start.py\" || exit 1" }] }
        ],
        "UserPromptSubmit": [
-         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/prompt-reminder.py\"" }] }
+         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/prompt-reminder.py\" || exit 1" }] }
        ],
        "Stop": [
-         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/stop-guard.py\"" }] }
+         { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/stop-guard.py\" || exit 1" }] }
        ],
        "PostToolUse": [
-         { "matcher": "Write|Edit|MultiEdit", "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/file-guard.py\"" }] }
+         { "matcher": "Write|Edit|MultiEdit", "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"$HOME/.claude/skills/plain-language/hooks/file-guard.py\" || exit 1" }] }
        ]
      }
    }
@@ -82,6 +82,11 @@ The skill has been tested on Linux only, with Claude Code 2.1.306, Python 3.9.25
    The `-I` option stops that project from changing what the hooks run.
    With it, Python does not load code from the project folder.
    It also ignores packages installed in your home folder, and any environment variable whose name starts with `PYTHON`.
+
+   Each command ends with `|| exit 1`.
+   If a hook's file is missing, Python exits with code 2.
+   Claude Code treats exit code 2 as an instruction to block, so the prompt hook would block every message you send.
+   `|| exit 1` changes the code to 1, so Claude Code reports an error and does not block anything.
 
 4. Turn off any plugin or setting that tells Claude to write in a terse style, such as the caveman plugin.
    Its instructions conflict with the rules in this skill.
@@ -125,17 +130,10 @@ If your hook commands run `node`, follow these steps in this order:
 2. In `~/.claude/settings.json`, replace your five hook entries with the entries in step 3 of the install steps.
 3. Start a new Claude Code session.
 
-Do not replace the hook entries before you pull.
-If a new hook's file is missing, Python exits with code 2.
-Claude Code treats exit code 2 as an instruction to block.
-For the prompt hook, that means Claude Code blocks every message you send.
-For the Stop hook, it means Claude cannot end its turn.
-
 ## Remove
 
 1. Delete the five hook entries from `~/.claude/settings.json`.
-   Do this first.
-   Once the hook files are gone, the prompt hook blocks every message you send, as the section above explains.
+   Do this first, because each hook reports an error once its file is missing.
 2. Delete the skill folder:
 
    ```

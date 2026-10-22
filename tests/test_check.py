@@ -347,6 +347,14 @@ def run_hook(name, event, cwd=None, env=None):
     return run([os.path.join(SKILL, "hooks", name)], json.dumps(event), cwd=cwd, env=env)
 
 
+def readme_hook_commands():
+    """Each (event, command) pair in the hooks JSON of the README's install steps."""
+    with open(os.path.join(SKILL, "README.md"), encoding="utf-8") as handle:
+        block = re.search(r"```json\n(.*?)```", handle.read(), re.DOTALL).group(1)
+    hooks = json.loads(block)["hooks"]
+    return [(event, hook["command"]) for event, entries in hooks.items() for entry in entries for hook in entry["hooks"]]
+
+
 class TheHooks(unittest.TestCase):
     def test_reads_every_text_block_claude_wrote_since_the_persons_last_message(self):
         transcript = "\n".join(
@@ -466,6 +474,24 @@ class TheHooks(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertNotIn("project folder", result.stderr)
                 self.assertTrue(json.loads(result.stdout))
+
+    # New in the Python version. Python exits with code 2 when the file it is asked to run
+    # is missing, and Claude Code reads exit code 2 from a prompt hook as an instruction
+    # to block the prompt. Each command in the README must turn that into exit code 1.
+    def test_no_hook_command_in_the_readme_exits_with_code_2_when_its_file_is_missing(self):
+        # HOME is an empty folder, so no hook file exists. PATH starts with a python3 that
+        # is this Python, so each command reaches Python instead of exiting at "command -v".
+        programs = temporary_folder(self)
+        os.symlink(sys.executable, os.path.join(programs, "python3"))
+        env = {**os.environ, "HOME": temporary_folder(self), "PATH": programs + os.pathsep + os.environ.get("PATH", "")}
+        commands = readme_hook_commands()
+        self.assertEqual(len(commands), 5)
+        for event, command in commands:
+            with self.subTest(event=event):
+                result = subprocess.run(["/bin/sh", "-c", command], input="{}", capture_output=True, encoding="utf-8", env=env)
+                self.assertIn("No such file", result.stderr)
+                self.assertNotEqual(result.returncode, 2)
+                self.assertEqual(result.returncode, 1)
 
     def test_the_prompt_hook_adds_a_one_line_reminder(self):
         result = json.loads(run_hook("prompt-reminder.py", {}).stdout)
