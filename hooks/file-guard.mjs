@@ -6,9 +6,11 @@
 // and MultiEdit, it is each paragraph the new text touches, so an edit to one line of
 // an old document is not held up by problems in the lines around it.
 //
-// Prose files are Markdown and plain text. A file containing the words
-// "plain-language-check: off" is skipped, which is how a file that discusses the
-// banned phrases opts out. A line containing "plain-language-allow" is skipped too.
+// Prose files are Markdown and plain text. A file with "plain-language-check: off" on a
+// line of its own, or in an HTML comment on a line of its own, is skipped. That is how a
+// file that discusses the banned phrases opts out. The marker inside a sentence does not
+// count, so a README that tells you how to use it is still checked. A line containing
+// "plain-language-allow" is skipped too.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { findings, format, loadRules } from "../scripts/check.mjs";
@@ -16,6 +18,7 @@ import { readStdin, reasonFor } from "./shared.mjs";
 
 const PROSE = new Set([".md", ".mdx", ".markdown", ".txt", ".rst", ".adoc"]);
 const SKIPPED_DIRECTORIES = /[\\/](?:node_modules|\.git|vendor|dist|build)[\\/]/;
+const CHECK_OFF = /^\s*(?:<!--\s*)?plain-language-check:\s*off\s*(?:-->)?\s*$/m;
 
 // The line ranges in `file` that hold each piece of new text.
 function changedRanges(file, newTexts) {
@@ -43,7 +46,7 @@ if (!PROSE.has(path.extname(target).toLowerCase()) || SKIPPED_DIRECTORIES.test(t
 let found = [];
 try {
   const file = readFileSync(target, "utf8");
-  if (file.includes("plain-language-check: off")) process.exit(0);
+  if (CHECK_OFF.test(file)) process.exit(0);
   const all = findings(file, loadRules(), { mode: "file" }).filter((one) => one.severity === "block");
   if (tool === "Write") {
     found = all;

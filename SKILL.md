@@ -147,7 +147,7 @@ Those stay with you.
 
 The checker skips code blocks, inline code, URLs, and text inside quotation marks.
 A line containing `plain-language-allow` is skipped.
-A file containing `plain-language-check: off` is skipped.
+A file with `<!-- plain-language-check: off -->` on a line of its own is skipped.
 Use that only for a file that lists banned phrases.
 
 When a hook sends text back, fix the sentences it names and send the text again.
