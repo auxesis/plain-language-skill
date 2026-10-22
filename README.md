@@ -24,7 +24,26 @@ The skill has been tested on Linux, with Claude Code 2.1.306 and Node.js 24.
    git clone https://github.com/auxesis/plain-language-skill.git ~/.claude/skills/plain-language
    ```
 
-2. Add the hooks to `~/.claude/settings.json`.
+2. Install Node.js, if you do not have version 20 or later.
+   If you use [mise](https://mise.jdx.dev/), the file `mise.toml` in this repository names the version to install:
+
+   ```
+   cd ~/.claude/skills/plain-language
+   mise install
+   ```
+
+   If mise asks you to trust the file, run `mise trust`.
+   The version applies only inside the skill folder.
+   The hooks run in the folder of the project you have open, so they need Node.js there too.
+   To install Node.js 24 for every folder, run this command:
+
+   ```
+   mise use --global node@24
+   ```
+
+   Without mise, install Node.js in any way you choose.
+
+3. Add the hooks to `~/.claude/settings.json`.
    If the file has no `hooks` key, add the `hooks` key below to the top level of the file.
    If the file already has a `hooks` key, add each entry below to the list for its event.
    Do not replace the hooks you already have.
@@ -53,10 +72,10 @@ The skill has been tested on Linux, with Claude Code 2.1.306 and Node.js 24.
 
    If Node.js is not installed, each hook exits without doing anything.
 
-3. Turn off any plugin or setting that tells Claude to write in a terse style, such as the caveman plugin.
+4. Turn off any plugin or setting that tells Claude to write in a terse style, such as the caveman plugin.
    Its instructions conflict with the rules in this skill.
 
-4. Start a new Claude Code session.
+5. Start a new Claude Code session.
    Claude Code loads hooks only when a session starts.
    To see the hooks that are loaded, type `/hooks`.
 
@@ -127,6 +146,9 @@ node scripts/check.mjs path/to/file.md
 ```
 
 ## Run the tests
+
+From the skill folder, run `mise run test`.
+Without mise, run this command:
 
 ```
 node --test tests/*.test.mjs
