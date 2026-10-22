@@ -227,6 +227,8 @@ describe("rules from the user's review of round two", () => {
     assert.deepEqual(blocking("Eight test inputs, run before and after the change.", "chat"), []);
     assert.deepEqual(blocking("I checked the page, before and after the change.", "chat"), []);
     assert.ok(!blocking("The report, written last week and sent today, lists the results.", "chat").includes("serial-comma"));
+    assert.deepEqual(blocking("For the run without the skill, all hooks and skills were turned off.", "chat"), []);
+    assert.ok(blocking("For the test, it covers words, headings and links.", "chat").includes("serial-comma"));
   });
 });
 

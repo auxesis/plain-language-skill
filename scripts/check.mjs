@@ -165,6 +165,10 @@ const NOT_AN_ITEM = /^(?:and|or|nor|with|without|by|for|from|in|on|at|to|into|on
 const IRREGULAR_PARTICIPLE = /^(?:run|made|done|given|taken|written|shown|seen|found|kept|left|sent|built|held|known|told|brought|bought|paid|led|lost|won|begun|chosen|drawn|driven|broken|spoken|thrown|hidden|grown)\b/iu;
 // A pair of words joined by "and" or "or", not the end of a list: "before and after", "in and out".
 const PAIRED_WORDS = new Set(["before", "after", "in", "out", "up", "down", "on", "off", "over", "under", "back", "forth", "to", "from", "above", "below", "inside", "outside", "here", "there"]);
+// An opening phrase that ends at the first comma, not the first item of a list: "For the
+// run without the skill, all hooks and skills were turned off." This misses a list that
+// follows such a phrase directly, as in "In Python, Go and Rust", which is rarer.
+const OPENING_PHRASE = /^\s*(?:For|In|On|At|By|With|Without|From|To|During|Under|Over|Across|Through|Within|Like|Unlike|Despite|As|Per)\b/;
 
 function commaFindings(piece, sentence, masked) {
   const found = [];
@@ -184,7 +188,7 @@ function commaFindings(piece, sentence, masked) {
   while ((match = LIST_END.exec(masked))) {
     const firstComma = masked.indexOf(",");
     const commaAt = match.index + match[1].length;
-    if (OPENING_CLAUSE.test(trimmed) && commaAt === firstComma) continue;
+    if ((OPENING_CLAUSE.test(trimmed) || OPENING_PHRASE.test(trimmed)) && commaAt === firstComma) continue;
     if (CLAUSE_WORDS.test(match[2]) || NOT_AN_ITEM.test(match[2]) || IRREGULAR_PARTICIPLE.test(match[2]) || countWords(match[2]) > 3) continue;
     const before = match[2].split(/\s+/).pop().toLowerCase();
     const after = (masked.slice(match.index + match[0].length - 1).match(/^[\p{L}]+/u) || [""])[0].toLowerCase();
