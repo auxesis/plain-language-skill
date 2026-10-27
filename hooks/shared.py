@@ -5,20 +5,12 @@ import select
 import sys
 import time
 
+from failure import hooks_off  # noqa: F401  (the hooks import it from here)
+
 # The hooks are at the plugin root, and the skill is in skills/plain-language. The paths
 # come from this file's own location, so they are right wherever the plugin is installed.
 SKILL = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "skills", "plain-language")
 CORE = os.path.join(SKILL, "core.md")
-
-
-def hooks_off():
-    """True when PLAIN_LANGUAGE_HOOKS is "false", in any case and with any spaces around it.
-
-    "PLAIN_LANGUAGE_HOOKS=false claude" starts a session in which every hook exits at once
-    and prints nothing. The skill still loads. Any other value, or no value, leaves the
-    hooks on.
-    """
-    return os.environ.get("PLAIN_LANGUAGE_HOOKS", "").strip().lower() == "false"
 
 
 def read_stdin(timeout=2.0):

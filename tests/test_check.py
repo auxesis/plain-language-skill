@@ -1,17 +1,21 @@
 # Run with: python3 -m unittest, from the root of the repository.
+import io
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 import warnings
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 SKILL = os.path.join(ROOT, "skills", "plain-language")
 sys.path[:0] = [os.path.join(SKILL, "scripts"), os.path.join(ROOT, "hooks")]
 
+import failure  # noqa: E402
 from check import findings, load_rules  # noqa: E402
 from prose import count_words, prose_units, sentences  # noqa: E402
 from settings import SettingsError, names_for  # noqa: E402
@@ -786,6 +790,9 @@ def read_json(*path):
 
 
 GUARD = "command -v python3 >/dev/null 2>&1 || exit 0; "
+# Only the SessionStart command says that python3 is missing. A warning from every
+# other hook would come with every message and every edit.
+SESSION_GUARD = "command -v python3 >/dev/null 2>&1 || { printf '%s\\n' '{\"systemMessage\":"
 HOOK_FILE = re.compile(r'python3 -I "\$\{CLAUDE_PLUGIN_ROOT\}/(hooks/[\w-]+\.py)"')
 
 
@@ -817,7 +824,7 @@ class ThePlugin(unittest.TestCase):
         for event, _, hook in plugin_hooks():
             with self.subTest(event=event):
                 command = hook["command"]
-                self.assertTrue(command.startswith(GUARD), command)
+                self.assertTrue(command.startswith(SESSION_GUARD if event == "SessionStart" else GUARD), command)
                 self.assertTrue(command.endswith(" || exit 1"), command)
                 self.assertTrue(os.path.isfile(os.path.join(ROOT, HOOK_FILE.search(command).group(1))), command)
 
@@ -851,6 +858,96 @@ class ThePlugin(unittest.TestCase):
         self.assertNotIn("version", plugin)
         self.assertNotIn("version", listed)
         self.assertTrue(os.path.isfile(os.path.join(ROOT, "skills", plugin["name"], "SKILL.md")))
+
+
+def broken_copy(test, module, code):
+    """A copy of the plugin in which `module` ends with `code`, so that a hook fails."""
+    copy = os.path.join(temporary_folder(test), "plugin")
+    for folder in ("hooks", "skills"):
+        shutil.copytree(os.path.join(ROOT, folder), os.path.join(copy, folder), ignore=shutil.ignore_patterns("__pycache__"))
+    path = {"shared.py": ("hooks", "shared.py"), "check.py": ("skills", "plain-language", "scripts", "check.py")}[module]
+    with open(os.path.join(copy, *path), "a", encoding="utf-8") as handle:
+        handle.write("\n" + code)
+    return copy
+
+
+PROSE = "We did it in order to test it."
+SYNTAX_ERROR = "def broken(:\n"
+RAISES_IN_EMIT = "def emit(payload):\n    raise RuntimeError('forced failure')\n"
+RAISES_IN_FINDINGS = "def findings(*args, **kwargs):\n    raise RuntimeError('forced failure')\n"
+# Each hook, the module it imports, code that makes it fail while it runs, the hook's
+# event, and what its warning says was not done.
+FAILING_HOOKS = [
+    ("session-start.py", "shared.py", RAISES_IN_EMIT, "SessionStart", "the plain-language rules were not added to this session"),
+    ("prompt-reminder.py", "shared.py", RAISES_IN_EMIT, "UserPromptSubmit", "the plain-language reminder was not added to this message"),
+    ("stop-guard.py", "check.py", RAISES_IN_FINDINGS, "Stop", "Claude's reply was not checked"),
+    ("file-guard.py", "check.py", RAISES_IN_FINDINGS, "PostToolUse", "the prose Claude just wrote to doc.md was not checked"),
+]
+
+
+class WhenAHookFails(unittest.TestCase):
+    def event(self, hook):
+        file = os.path.join(temporary_folder(self), "doc.md")
+        write(file, PROSE + "\n")
+        return {
+            "session-start.py": {"hook_event_name": "SessionStart"},
+            "prompt-reminder.py": {},
+            "stop-guard.py": {"last_assistant_message": PROSE},
+            "file-guard.py": {"tool_name": "Write", "tool_input": {"file_path": file}},
+        }[hook]
+
+    def run_copy(self, copy, hook, env=None):
+        result = run([os.path.join(copy, "hooks", hook)], json.dumps(self.event(hook)), env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout
+
+    def test_each_hook_warns_the_person_and_does_not_block_claude_when_its_code_fails(self):
+        for hook, module, code, event, missed in FAILING_HOOKS:
+            with self.subTest(hook=hook):
+                out = json.loads(self.run_copy(broken_copy(self, module, code), hook))
+                self.assertEqual(list(out), ["systemMessage"])
+                message = out["systemMessage"]
+                self.assertIn(f"the {event} hook failed at {module} line ", message)
+                self.assertIn(missed, message)
+                self.assertIn("RuntimeError: forced failure", message)
+                self.assertNotIn(PROSE, message)
+
+    def test_each_hook_warns_when_the_code_it_imports_cannot_be_read(self):
+        for hook, module, _, event, _ in FAILING_HOOKS:
+            with self.subTest(hook=hook):
+                message = json.loads(self.run_copy(broken_copy(self, module, SYNTAX_ERROR), hook))["systemMessage"]
+                self.assertIn(f"the {event} hook failed at {module} line ", message)
+                self.assertIn("SyntaxError", message)
+
+    def test_a_failing_hook_says_nothing_when_the_hooks_are_switched_off(self):
+        env = {**os.environ, "PLAIN_LANGUAGE_HOOKS": "false"}
+        for hook, module, code, _, _ in FAILING_HOOKS:
+            for broken in (code, SYNTAX_ERROR):
+                with self.subTest(hook=hook, broken=broken[:12]):
+                    self.assertEqual(self.run_copy(broken_copy(self, module, broken), hook, env=env), "")
+
+    def test_the_warning_quotes_at_most_200_characters_of_the_error(self):
+        out = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+        with mock.patch.dict(os.environ, {"PLAIN_LANGUAGE_HOOKS": ""}), mock.patch.object(sys, "stdout", out):
+            try:
+                raise ValueError("x" * 500)
+            except ValueError as error:
+                self.assertEqual(failure.report("Stop", "nothing was checked", error), 0)
+        detail = json.loads(out.buffer.getvalue())["systemMessage"].split("The error was ", 1)[1]
+        self.assertEqual(len(detail), failure.LIMIT)
+        self.assertTrue(detail.endswith("..."))
+
+    def test_only_the_session_command_says_that_python3_is_missing(self):
+        env = {**os.environ, "PATH": temporary_folder(self), "CLAUDE_PLUGIN_ROOT": ROOT}
+        for event, _, hook in plugin_hooks():
+            with self.subTest(event=event):
+                command = hook["command"].replace("${CLAUDE_PLUGIN_ROOT}", ROOT)
+                result = subprocess.run(["/bin/sh", "-c", command], input="{}", capture_output=True, encoding="utf-8", env=env)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                if event == "SessionStart":
+                    self.assertRegex(json.loads(result.stdout)["systemMessage"], "python3 was not found")
+                else:
+                    self.assertEqual(result.stdout, "")
 
 
 if __name__ == "__main__":

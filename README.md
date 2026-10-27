@@ -86,6 +86,9 @@ The five hook commands are in `hooks/hooks.json`.
 Claude Code replaces `${CLAUDE_PLUGIN_ROOT}` in each command with the folder where it installed the plugin.
 
 If Python 3 is not installed, each hook exits without doing anything.
+The session hook also shows you a warning that says the hooks are off.
+The other hooks stay silent, so you do not get a warning with every message.
+
 Each command runs Python with the `-I` option.
 That option stops your project from changing what the hooks run.
 With it, Python does not load code from the project folder.
@@ -95,6 +98,21 @@ Each command ends with `|| exit 1`.
 If a hook's file is missing, Python exits with code 2.
 Claude Code treats exit code 2 as an instruction to block, so the prompt hook would block every message you send.
 `|| exit 1` changes the code to 1, so Claude Code reports an error and does not block anything.
+
+### When a hook fails
+
+A hook can fail because of a fault in its own code or in the checker.
+When that happens, the hook shows you a warning and lets Claude go on.
+The warning names the hook, says what was not checked, and says where the code failed.
+For example:
+
+```text
+plain-language: the Stop hook failed at check.py line 975, so Claude's reply was not checked against the plain-language rules. The error was RuntimeError: forced failure
+```
+
+A failing hook never blocks Claude, because a fault in the plugin must not stop your work.
+It never stays silent either, because then you would believe your text was checked.
+With `PLAIN_LANGUAGE_HOOKS=false`, a failing hook shows nothing, the same as a working one.
 
 ### Use the skill without the hooks
 
