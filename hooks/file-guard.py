@@ -11,6 +11,9 @@
 # file that discusses the banned phrases opts out. The marker inside a sentence does not
 # count, so a README that tells you how to use it is still checked. A line containing
 # "plain-language-allow" is skipped too.
+#
+# When Claude writes the project's .plain-language.json, the hook checks that file
+# instead, so a mistake in it is reported at once.
 import os
 import re
 import sys
@@ -21,7 +24,8 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "skills", "plain-language", "scripts")]
 
 from check import findings, format_finding, load_rules  # noqa: E402
-from shared import emit, hooks_off, parse_event, read_stdin, read_text, reason_for  # noqa: E402
+from settings import FILE_NAME, SettingsError, load, names_for  # noqa: E402
+from shared import broken_settings, emit, hooks_off, parse_event, read_stdin, read_text, reason_for  # noqa: E402
 
 PROSE = {".md", ".mdx", ".markdown", ".txt", ".rst", ".adoc"}
 SKIPPED_DIRECTORIES = re.compile(r"[\\/](?:node_modules|\.git|vendor|dist|build)[\\/]")
@@ -69,6 +73,12 @@ def main():
     target = tool_input.get("file_path") if isinstance(tool_input, dict) else None
     if tool not in ("Write", "Edit", "MultiEdit") or not isinstance(target, str):
         return 0
+    if basename(target) == FILE_NAME:
+        try:
+            load(target)
+        except SettingsError as error:
+            emit(broken_settings(error, f"The file {target}"))
+        return 0
     if extname(target).lower() not in PROSE or SKIPPED_DIRECTORIES.search(target):
         return 0
 
@@ -76,7 +86,7 @@ def main():
         file = read_text(target)
         if CHECK_OFF.search(file):
             return 0
-        found = [one for one in findings(file, load_rules(), mode="file") if one["severity"] == "block"]
+        found = [one for one in findings(file, load_rules(), mode="file", names=names_for(target)) if one["severity"] == "block"]
         if tool != "Write":
             if tool == "Edit":
                 new_texts = [tool_input.get("new_string")]
@@ -84,6 +94,9 @@ def main():
                 new_texts = [edit.get("new_string") if isinstance(edit, dict) else None for edit in tool_input.get("edits") or []]
             ranges = changed_ranges(file, new_texts)
             found = [one for one in found if any(one["span"][0] <= last and one["span"][1] >= first for first, last in ranges)]
+    except SettingsError as error:
+        emit(broken_settings(error, f"The prose just written to {target}"))
+        return 0
     except Exception:
         # A broken guard must not stop the work.
         return 0

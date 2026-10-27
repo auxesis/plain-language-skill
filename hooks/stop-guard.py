@@ -11,7 +11,8 @@
 # skills/plain-language/scripts/prose.py).
 #
 # Input is the Stop hook's JSON on stdin:
-# { transcript_path, last_assistant_message, stop_hook_active }.
+# { transcript_path, last_assistant_message, stop_hook_active, cwd }.
+# The names in the settings file for cwd, the session's folder, are read as one word.
 # Output is nothing, which lets the turn end, or {"decision":"block","reason":...},
 # which gives the reason back to Claude to act on.
 #
@@ -26,7 +27,8 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "skills", "plain-language", "scripts")]
 
 from check import findings, format_finding, load_rules  # noqa: E402
-from shared import emit, hooks_off, parse_event, read_stdin, reason_for, truthy  # noqa: E402
+from settings import SettingsError, names_for  # noqa: E402
+from shared import broken_settings, emit, hooks_off, parse_event, read_stdin, reason_for, truthy  # noqa: E402
 from transcript import tail, turn_text  # noqa: E402
 
 
@@ -55,8 +57,13 @@ def main():
     if not text:
         return 0
 
+    cwd = event.get("cwd")
     try:
-        found = [one for one in findings(text, load_rules(), mode="chat") if one["severity"] == "block"]
+        names = names_for(cwd if isinstance(cwd, str) and cwd else os.getcwd())
+        found = [one for one in findings(text, load_rules(), mode="chat", names=names) if one["severity"] == "block"]
+    except SettingsError as error:
+        emit(broken_settings(error, "Your reply"))
+        return 0
     except Exception:
         # A broken guard must not stop the work.
         return 0

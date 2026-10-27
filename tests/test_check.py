@@ -14,6 +14,7 @@ sys.path[:0] = [os.path.join(SKILL, "scripts"), os.path.join(ROOT, "hooks")]
 
 from check import findings, load_rules  # noqa: E402
 from prose import count_words, prose_units, sentences  # noqa: E402
+from settings import SettingsError, names_for  # noqa: E402
 from transcript import turn_text  # noqa: E402
 
 rules = load_rules()
@@ -543,7 +544,7 @@ class TheHooks(unittest.TestCase):
     # so a file there named like one of the hook's modules must not be imported.
     def test_every_hook_ignores_python_files_and_variables_in_the_project_folder(self):
         folder = temporary_folder(self)
-        for name in ("json", "re", "check", "prose", "shared", "transcript"):
+        for name in ("json", "re", "check", "prose", "settings", "shared", "transcript"):
             write(os.path.join(folder, f"{name}.py"), "raise SystemExit('imported from the project folder')\n")
         env = {**os.environ, "PYTHONPATH": folder}
         file = os.path.join(folder, "doc.md")
@@ -580,6 +581,153 @@ class TheHooks(unittest.TestCase):
                 path = re.search(r"(/\S+/core\.md)", text).group(1)
                 self.assertEqual(path, os.path.join(SKILL, "core.md"))
                 self.assertTrue(os.path.isfile(path))
+
+
+# Three passages from a real guide that the checker misread before it knew the names.
+GLOSSARY = "- **Fit for Role assessment** — one of the eight Fit for Role assessments.\n  They are Swim, Lift and Shift, Carry, Hike, Drag, Haul, Hold, and Ladder Climb and Lift.\n"
+CLUSTER = "For a whole cluster, select every unit in it, and the cluster's own name too. aXcelerate's filter does not accept a cluster name on its own.\n"
+RANK = "The Rank and Insignia Procedure awards a rank on three things: training and skills, service experience and proficiency, and aptitude and behaviour.\n"
+NAMED_CASES = [
+    ("a name with and in it is not the end of a list", GLOSSARY, "Lift and Shift", "serial-comma"),
+    ("a name that starts with a small letter can start a sentence", CLUSTER, "aXcelerate", "long-sentence"),
+    ("a name made of a pair is one item in a list", RANK, "service experience and proficiency", "serial-comma"),
+]
+
+
+def blocking_with(text, names, mode="file"):
+    return [one["id"] for one in findings(text, rules, mode=mode, names=names) if one["severity"] == "block"]
+
+
+def repository(test, settings=None):
+    """A temporary git repository, with a settings file at its top when `settings` is given."""
+    root = temporary_folder(test)
+    os.mkdir(os.path.join(root, ".git"))
+    if settings is not None:
+        write(os.path.join(root, ".plain-language.json"), settings if isinstance(settings, str) else json.dumps(settings))
+    return root
+
+
+class ProjectNames(unittest.TestCase):
+    def test_a_name_counts_as_one_word(self):
+        text = f"Members {' '.join(f'w{i}' for i in range(21))} passed Ladder Climb and Lift.\n"
+        self.assertIn("long-sentence", blocking(text))
+        self.assertNotIn("long-sentence", blocking_with(text, ("Ladder Climb and Lift",)))
+
+    def test_matches_a_name_only_in_its_own_case_and_as_a_whole_word(self):
+        for written in ("axcelerate", "aXcelerateX"):
+            with self.subTest(written=written):
+                self.assertIn("long-sentence", blocking_with(CLUSTER.replace("aXcelerate", written), ("aXcelerate",)))
+
+    def test_shows_the_readers_own_words_in_every_finding(self):
+        [wordy] = [one for one in findings("aXcelerate does it in order to test it.", rules, names=("aXcelerate",)) if one["id"] == "wordy"]
+        self.assertEqual(wordy["excerpt"], "aXcelerate does it in order to test it.")
+        [repeated] = [one for one in findings("Pass Lift and Shift Lift and Shift first.", rules, names=("Lift and Shift",)) if one["id"] == "repeated-word"]
+        self.assertEqual(repeated["match"], "Lift and Shift Lift and Shift")
+
+    def test_does_not_read_two_names_of_the_same_length_as_one_word_twice(self):
+        self.assertNotIn("repeated-word", blocking_with("Pass Hike Drag first.", ("Hike", "Drag")))
+
+    # Each name is read as one stand-in word of the same length. A rule that matched the
+    # stand-in would report a problem the reader cannot see.
+    def test_no_rule_matches_the_word_that_stands_in_for_a_name(self):
+        for length in range(1, 61):
+            name = "q" * length
+            for text in (f"The {name} is here.", f"{name} is here.", f"- {name}"):
+                with self.subTest(text=text):
+                    self.assertEqual(findings(text, rules, mode="chat", names=(name,)), [])
+
+    def test_finds_the_nearest_settings_file_up_to_the_top_of_the_repository(self):
+        root = repository(self, {"names": ["aXcelerate"]})
+        os.makedirs(os.path.join(root, "docs", "guide"))
+        page = os.path.join(root, "docs", "guide", "page.md")
+        self.assertEqual(names_for(page), ("aXcelerate",))
+        write(os.path.join(root, "docs", ".plain-language.json"), json.dumps({"names": ["Lift and Shift"]}))
+        self.assertEqual(names_for(page), ("Lift and Shift",))
+
+    # In a git worktree, .git is a file, not a folder.
+    def test_does_not_use_a_settings_file_above_the_top_of_the_repository(self):
+        outer = temporary_folder(self)
+        write(os.path.join(outer, ".plain-language.json"), json.dumps({"names": ["aXcelerate"]}))
+        os.mkdir(os.path.join(outer, "project"))
+        write(os.path.join(outer, "project", ".git"), "gitdir: /elsewhere\n")
+        self.assertEqual(names_for(os.path.join(outer, "project", "page.md")), ())
+
+    BROKEN = [
+        ("not JSON", '{"names": ["aXcelerate"]', "cannot be read as JSON"),
+        ("not an object", '["aXcelerate"]', "must be a JSON object"),
+        ("an unknown setting", '{"names": [], "rules": {"long-sentence": false}}', '"rules" is not a setting'),
+        ("names that are not a list", '{"names": "aXcelerate"}', '"names" must be a list'),
+        ("a name that is not a string", '{"names": [7]}', "each name must be a string"),
+        ("a name with no letter in it", '{"names": [" - "]}', "each name must be a string"),
+        ("a name that ends with a space", '{"names": ["aXcelerate "]}', "starts or ends with a space"),
+    ]
+
+    def check_broken(self, case):
+        _, content, reason = case
+        root = repository(self, content)
+        with self.assertRaises(SettingsError) as raised:
+            names_for(root)
+        self.assertEqual(raised.exception.path, os.path.join(root, ".plain-language.json"))
+        self.assertIn(reason, raised.exception.reason)
+
+    def test_the_command_line_reads_the_settings_file_for_each_file_and_for_standard_input(self):
+        root = repository(self)
+        page = os.path.join(root, "page.md")
+        write(page, CLUSTER)
+        self.assertEqual(run([CLI, page]).returncode, 1)
+        self.assertEqual(run([CLI, "--chat"], CLUSTER, cwd=root).returncode, 1)
+        write(os.path.join(root, ".plain-language.json"), json.dumps({"names": ["aXcelerate"]}))
+        self.assertEqual(run([CLI, page]).returncode, 0)
+        self.assertEqual(run([CLI, "--chat"], CLUSTER, cwd=root).returncode, 0)
+
+    def test_the_command_line_exits_2_and_names_a_broken_settings_file(self):
+        root = repository(self, '{"names": "aXcelerate"}')
+        page = os.path.join(root, "page.md")
+        write(page, CLUSTER)
+        result = run([CLI, page])
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertIn(os.path.join(root, ".plain-language.json"), result.stderr)
+        self.assertIn('"names" must be a list', result.stderr)
+
+    def test_the_file_hook_reads_the_names_and_reports_a_broken_settings_file(self):
+        root = repository(self, {"names": ["aXcelerate"]})
+        page = os.path.join(root, "page.md")
+        write(page, CLUSTER)
+        event = {"tool_name": "Write", "tool_input": {"file_path": page}}
+        self.assertEqual(run_hook("file-guard.py", event).stdout, "")
+        write(os.path.join(root, ".plain-language.json"), "{")
+        reason = json.loads(run_hook("file-guard.py", event).stdout)["reason"]
+        self.assertIn(os.path.join(root, ".plain-language.json"), reason)
+        self.assertIn("was not checked", reason)
+
+    def test_the_file_hook_checks_the_settings_file_when_claude_writes_it(self):
+        root = repository(self, {"names": ["aXcelerate"]})
+        event = {"tool_name": "Write", "tool_input": {"file_path": os.path.join(root, ".plain-language.json")}}
+        self.assertEqual(run_hook("file-guard.py", event).stdout, "")
+        write(os.path.join(root, ".plain-language.json"), json.dumps({"names": ["aXcelerate"], "sentenceWords": 40}))
+        self.assertRegex(json.loads(run_hook("file-guard.py", event).stdout)["reason"], '"sentenceWords" is not a setting')
+
+    def test_the_stop_hook_reads_the_names_for_the_sessions_folder(self):
+        root = repository(self, {"names": ["aXcelerate"]})
+        event = {"transcript_path": "/nonexistent/t.jsonl", "last_assistant_message": CLUSTER, "cwd": root}
+        self.assertEqual(run_hook("stop-guard.py", event).stdout, "")
+        self.assertEqual(json.loads(run_hook("stop-guard.py", {**event, "cwd": temporary_folder(self)}).stdout)["decision"], "block")
+        write(os.path.join(root, ".plain-language.json"), '{"names": [7]}')
+        reason = json.loads(run_hook("stop-guard.py", event).stdout)["reason"]
+        self.assertIn("Your reply was not checked", reason)
+
+
+add_cases(
+    ProjectNames,
+    "names",
+    NAMED_CASES,
+    lambda self, case: (
+        self.assertIn(case[3], blocking(case[1])),
+        self.assertNotIn(case[3], blocking_with(case[1], (case[2],))),
+    ),
+)
+add_cases(ProjectNames, "broken", ProjectNames.BROKEN, ProjectNames.check_broken)
 
 
 def env_with(value):

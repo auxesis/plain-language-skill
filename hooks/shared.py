@@ -76,6 +76,18 @@ def read_text(path):
         return handle.read().decode("utf-8", "replace")
 
 
+def broken_settings(error, what):
+    """Tells Claude that the settings file is broken, instead of checking without its names."""
+    return {
+        "decision": "block",
+        "reason": (
+            f"The plain-language settings file {error.path} is broken: {error.reason}. "
+            f"{what} was not checked. Fix the settings file. "
+            'It can contain only "names", a list of names, such as {"names": ["aXcelerate"]}.'
+        ),
+    }
+
+
 # A long list of findings buries the first ones, so a reason shows at most this many.
 SHOWN = 12
 
