@@ -210,6 +210,40 @@ The checker script ignores the variable.
 
 The checker never checks code blocks, inline code, URLs, or text in double quotation marks.
 
+## Tell the checker your project's names
+
+The checker can report a mistake where a name is written correctly:
+
+- "aXcelerate" starts with a small letter. So a sentence that starts with it is joined to the sentence before.
+- "Lift and Shift" contains "and". So the checker reads it as the end of a list.
+
+To stop this, list the names in a file named `.plain-language.json` at the top of your project:
+
+```json
+{
+  "names": ["aXcelerate", "Lift and Shift"]
+}
+```
+
+The checker then reads each name as one word.
+A name matches only in the same case, and only as a whole word.
+Each finding still shows the name as you wrote it.
+
+The checker looks for the file in the folder of the file it checks, then in each folder above.
+It stops at the top of the git repository, the folder that contains `.git`.
+For a chat reply, it starts in the folder of the Claude Code session.
+The checker that you run by hand finds the same file as the hooks.
+
+The file can list names and nothing else.
+It cannot turn a rule off or change a limit, because that would hide real problems as well as false ones.
+To skip one line, use `plain-language-allow`, as "Skip a check" describes.
+
+A broken settings file is never ignored:
+
+- The checker that you run by hand prints the file's path and the problem, and exits with code 2.
+- The hooks tell Claude what is wrong with the file, and that nothing was checked.
+- When Claude writes the file, the file hook checks it straight away.
+
 ## Files
 
 | File | What it contains |
@@ -222,6 +256,7 @@ The checker never checks code blocks, inline code, URLs, or text in double quota
 | `skills/plain-language/references/content-guidance.md` | The GOV.UK rules, including the words to avoid |
 | `skills/plain-language/scripts/check.py` | The checker that the hooks use |
 | `skills/plain-language/scripts/rules.json` | The list of rules the checker applies |
+| `skills/plain-language/scripts/settings.py` | The code that finds and reads a project's `.plain-language.json` |
 | `hooks/hooks.json` | The commands that run the hooks |
 | `hooks/*.py` | The four hooks, and the code they share |
 | `tests/` | Tests for the checker, the hooks, and the plugin files |

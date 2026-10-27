@@ -7,7 +7,11 @@
 #   python3 check.py [--json] [--block-only] [--chat] [file ...]
 #
 # With no file, it reads standard input. It exits 1 when there is a finding that
-# must be fixed, and 0 otherwise, so it can sit in a script or a hook.
+# must be fixed, and 0 otherwise, so it can sit in a script or a hook. It exits 2
+# when a project's settings file is broken, and names the file.
+#
+# Each file is read with the names in the project's .plain-language.json (see
+# settings.py). Standard input is read with the names for the current folder.
 #
 # It checks what a machine can check: word lists, sentence and paragraph length,
 # asides that interrupt a sentence. It cannot decide whether the reader needs a
@@ -20,6 +24,7 @@ import os
 import re
 import sys
 from decimal import ROUND_HALF_UP, Decimal
+from functools import lru_cache
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 # A hook runs this with "python3 -I", which leaves the script's own folder off the
@@ -28,6 +33,7 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 from prose import PLACEHOLDERS, count_words, prose_units, sentences  # noqa: E402
+from settings import SettingsError, names_for  # noqa: E402
 
 # The code points that JavaScript's \p{Extended_Pictographic} matches, which Python's
 # re module cannot name. They were listed by Node.js 24.22, which uses Unicode 17.0.
@@ -120,10 +126,45 @@ def load_rules(file=os.path.join(HERE, "rules.json")):
 PROSE_KINDS = {"paragraph", "item"}
 
 
+@lru_cache(maxsize=16)
+def names_pattern(names):
+    if not names:
+        return None
+    # The longest name wins where two overlap, as "Lift" and "Lift and Shift" do.
+    alternatives = "|".join(re.escape(name) for name in sorted(set(names), key=len, reverse=True))
+    return re.compile(rf"(?<![^\W_])(?:{alternatives})(?![^\W_])")
+
+
+def stand_in(match):
+    # One word with a capital letter, so a name such as "aXcelerate" can start a
+    # sentence. It has the name's length, so an offset into the piece is the same in
+    # the reader's words. No rule matches it; a test checks lengths 1 to 60.
+    return "N" + "n" * (len(match.group(0)) - 1)
+
+
+def read_names(pieces, names):
+    """Reads each of a project's names as one word.
+
+    The checks read `text` and `masked`, in which each name is a stand-in word. What a
+    finding shows the reader comes from `shown` and `shown_masked`, which keep the
+    reader's own words.
+    """
+    pattern = names_pattern(tuple(names))
+    for piece in pieces:
+        piece.shown, piece.shown_masked = piece.text, piece.masked
+        if pattern:
+            piece.text = pattern.sub(stand_in, piece.text)
+            piece.masked = pattern.sub(stand_in, piece.masked)
+
+
+def shown(piece, start, end):
+    return piece.shown_masked[start:end]
+
+
 def excerpt_around(piece, index):
     found = sentences(piece.text)
     sentence = next((one for one in reversed(found) if one.offset <= index), found[0] if found else None)
-    text = (sentence.text if sentence else piece.text).strip()
+    text = (piece.shown[sentence.offset : sentence.offset + len(sentence.text)] if sentence else piece.shown).strip()
     return f"{text[:157]}..." if len(text) > 160 else text
 
 
@@ -151,7 +192,7 @@ def phrase_findings(piece, rules):
         for item in rule["items"]:
             for match in item["re"].finditer(piece.masked):
                 say = rule["say"].replace("{instead}", item["instead"] or "", 1)
-                found.append({**finding(rule, piece, match.start(), say), "match": match.group(0).strip()})
+                found.append({**finding(rule, piece, match.start(), say), "match": shown(piece, match.start(), match.end()).strip()})
     return found
 
 
@@ -161,19 +202,24 @@ def thing_verb_findings(piece, sentence, masked, rules):
     tv = rules["thingVerbs"]
     rule = {"id": "thing-given-person-verb", "severity": "block", "clause": tv["clause"]}
     found = []
+
+    def add(match):
+        start, end = sentence.offset + match.start(), sentence.offset + match.end()
+        found.append({**finding(rule, piece, start, tv["say"]), "match": shown(piece, start, end)})
+
     for pattern in tv["subjects"]:
         for match in pattern.finditer(masked):
             up_to_verb = masked[: match.end() - len(match.group(1))]
             if tv["person"].search(up_to_verb):
                 continue
-            found.append({**finding(rule, piece, sentence.offset + match.start(), tv["say"]), "match": match.group(0)})
+            add(match)
     for match in tv["held"].finditer(masked):
-        found.append({**finding(rule, piece, sentence.offset + match.start(), tv["say"]), "match": match.group(0)})
+        add(match)
     # The subject is a thing and the verb comes later: "CODE is new and holds the glossary".
     if not found and tv["thingSubject"].search(masked):
         later = tv["anyVerb"].search(masked)
         if later and not tv["person"].search(masked[: later.end()]):
-            found.append({**finding(rule, piece, sentence.offset + later.start(), tv["say"]), "match": later.group(0)})
+            add(later)
     return found
 
 
@@ -274,13 +320,15 @@ def comma_findings(piece, sentence, masked):
 
 def sentence_phrase_findings(piece, sentence, masked, rules):
     found = []
+    start = sentence.offset + len(masked) - len(masked.lstrip())
     for rule in rules["phrases"]:
         if rule.get("scope") != "sentence":
             continue
         for item in rule["items"]:
             match = item["re"].search(masked.strip())
             if match:
-                found.append({**finding(rule, piece, sentence.offset, rule["say"]), "match": match.group(0)[:60]})
+                words = shown(piece, start + match.start(), start + match.end())
+                found.append({**finding(rule, piece, sentence.offset, rule["say"]), "match": words[:60]})
     return found
 
 
@@ -510,6 +558,10 @@ def repeated_word_findings(piece):
     for match in REPEATED_WORD.finditer(piece.masked):
         if any(word in PLACEHOLDERS for word in match.group(0).split()):
             continue
+        # Two different names of the same length have the same stand-in word.
+        second = match.end() - len(match.group(1))
+        if shown(piece, match.start(1), match.end(1)).lower() != shown(piece, second, match.end()).lower():
+            continue
         found.append(
             {
                 **finding(
@@ -518,7 +570,7 @@ def repeated_word_findings(piece):
                     match.start(),
                     'The same word comes twice in a row, which is hard to read. Write "the stand-in for each test", not "the stand-in in each test".',
                 ),
-                "match": match.group(0),
+                "match": shown(piece, match.start(), match.end()),
             }
         )
     return found
@@ -820,13 +872,15 @@ def source_findings(markdown, rules):
 WHITE_SPACE = str.maketrans({"﻿": " ", "\x85": "\x7f", "\x1c": "\x7f", "\x1d": "\x7f", "\x1e": "\x7f", "\x1f": "\x7f"})
 
 
-def findings(markdown, rules=None, mode="file"):
+def findings(markdown, rules=None, mode="file", names=()):
     """Every finding for one Markdown text, in line order. `mode` is "file" or "chat"; a
-    chat reply is too short for the rhythm check to mean anything."""
+    chat reply is too short for the rhythm check to mean anything. `names` are the
+    project's names, from its settings file."""
     if rules is None:
         rules = load_rules()
     markdown = markdown.translate(WHITE_SPACE)
     pieces = prose_units(markdown)
+    read_names(pieces, names)
     found = [
         *source_findings(markdown, rules),
         *structure_findings(markdown),
@@ -886,13 +940,18 @@ def main(argv):
     files = [arg for arg in argv if not arg.startswith("--")]
     rules = load_rules()
     if files:
-        inputs = [(file, read_text(file)) for file in files]
+        inputs = [(file, read_text(file), file) for file in files]
     else:
-        inputs = [("stdin", sys.stdin.buffer.read().decode("utf-8", "replace"))]
+        inputs = [("stdin", sys.stdin.buffer.read().decode("utf-8", "replace"), os.getcwd())]
 
     results = []
-    for where, text in inputs:
-        found = findings(text, rules, mode=mode)
+    for where, text, start in inputs:
+        try:
+            names = names_for(start)
+        except SettingsError as error:
+            print(f"The settings file {error.path} is broken: {error.reason}.", file=sys.stderr)
+            return 2
+        found = findings(text, rules, mode=mode, names=names)
         results.append({"where": where, "findings": [one for one in found if one["severity"] == "block"] if block_only else found})
 
     def total(severity):
