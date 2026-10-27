@@ -14,7 +14,8 @@
 # { transcript_path, last_assistant_message, stop_hook_active, cwd }.
 # The names in the settings file for cwd, the session's folder, are read as one word.
 # Output is nothing, which lets the turn end, or {"decision":"block","reason":...},
-# which gives the reason back to Claude to act on.
+# which gives the reason back to Claude to act on. When the hook's own code fails, the
+# output is {"systemMessage":...}, a warning for the person (see failure.py).
 #
 # When the hook has already sent this turn back once, stop_hook_active is true and the
 # hook lets the turn end. Sending it back a second time could loop for ever.
@@ -26,10 +27,17 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 # the import path, so it and the checker's folder are added here.
 sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "skills", "plain-language", "scripts")]
 
-from check import findings, format_finding, load_rules  # noqa: E402
-from settings import SettingsError, names_for  # noqa: E402
-from shared import broken_settings, emit, hooks_off, parse_event, read_stdin, reason_for, truthy  # noqa: E402
-from transcript import tail, turn_text  # noqa: E402
+from failure import report, run  # noqa: E402
+
+MISSED = "Claude's reply was not checked against the plain-language rules"
+
+try:
+    from check import findings, format_finding, load_rules  # noqa: E402
+    from settings import SettingsError, names_for  # noqa: E402
+    from shared import broken_settings, emit, hooks_off, parse_event, read_stdin, reason_for, truthy  # noqa: E402
+    from transcript import tail, turn_text  # noqa: E402
+except Exception as error:
+    sys.exit(report("Stop", MISSED, error))
 
 
 def earlier_text(transcript_path):
@@ -37,8 +45,9 @@ def earlier_text(transcript_path):
         return ""
     try:
         return turn_text(tail(transcript_path))
-    except Exception:
-        # A missing or unreadable transcript is not a language problem.
+    except OSError:
+        # A missing or unreadable transcript is not a language problem. The reply in
+        # last_assistant_message is still checked.
         return ""
 
 
@@ -64,9 +73,6 @@ def main():
     except SettingsError as error:
         emit(broken_settings(error, "Your reply"))
         return 0
-    except Exception:
-        # A broken guard must not stop the work.
-        return 0
     if not found:
         return 0
 
@@ -83,4 +89,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run(main, "Stop", MISSED))

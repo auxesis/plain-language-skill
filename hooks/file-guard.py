@@ -14,6 +14,9 @@
 #
 # When Claude writes the project's .plain-language.json, the hook checks that file
 # instead, so a mistake in it is reported at once.
+#
+# When the hook's own code fails, it warns the person and lets Claude go on (see
+# failure.py).
 import os
 import re
 import sys
@@ -23,9 +26,16 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 # the import path, so it and the checker's folder are added here.
 sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "skills", "plain-language", "scripts")]
 
-from check import findings, format_finding, load_rules  # noqa: E402
-from settings import FILE_NAME, SettingsError, load, names_for  # noqa: E402
-from shared import broken_settings, emit, hooks_off, parse_event, read_stdin, read_text, reason_for  # noqa: E402
+from failure import report, run  # noqa: E402
+
+MISSED = "the prose Claude just wrote was not checked against the plain-language rules"
+
+try:
+    from check import findings, format_finding, load_rules  # noqa: E402
+    from settings import FILE_NAME, SettingsError, load, names_for  # noqa: E402
+    from shared import broken_settings, emit, hooks_off, parse_event, read_stdin, read_text, reason_for  # noqa: E402
+except Exception as error:
+    sys.exit(report("PostToolUse", MISSED, error))
 
 PROSE = {".md", ".mdx", ".markdown", ".txt", ".rst", ".adoc"}
 SKIPPED_DIRECTORIES = re.compile(r"[\\/](?:node_modules|\.git|vendor|dist|build)[\\/]")
@@ -97,9 +107,8 @@ def main():
     except SettingsError as error:
         emit(broken_settings(error, f"The prose just written to {target}"))
         return 0
-    except Exception:
-        # A broken guard must not stop the work.
-        return 0
+    except Exception as error:
+        return report("PostToolUse", f"the prose Claude just wrote to {basename(target)} was not checked against the plain-language rules", error)
     if not found:
         return 0
 
@@ -116,4 +125,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run(main, "PostToolUse", MISSED))

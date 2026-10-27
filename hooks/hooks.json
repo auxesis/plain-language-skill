@@ -2,7 +2,7 @@
   "description": "Adds the plain-language rules to every session and subagent, and checks each chat reply and each prose file Claude writes.",
   "hooks": {
     "SessionStart": [
-      { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.py\" || exit 1" }] }
+      { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || { printf '%s\\n' '{\"systemMessage\":\"plain-language: python3 was not found, so the plain-language hooks are off in this session. Install Python 3.9 or later, then start a new session.\"}'; exit 0; }; python3 -I \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.py\" || exit 1" }] }
     ],
     "SubagentStart": [
       { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.py\" || exit 1" }] }
