@@ -31,7 +31,10 @@ def main():
     if event.get("tool_name") != "Read" or not isinstance(path, str) or not path:
         return 0
 
-    folder = os.path.realpath(state_folder("findings", create=False))
+    try:
+        folder = os.path.realpath(state_folder("findings", create=False))
+    except OSError:
+        return 0
     target = os.path.realpath(path)
     if os.path.dirname(target) != folder or not os.path.isfile(target):
         return 0

@@ -40,11 +40,13 @@ sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "skills", "plain-langu
 from failure import report, run  # noqa: E402
 
 MISSED = "Claude's reply was not checked against the plain-language rules"
+# With hidden drafts on, a reply the display hook hid stays hidden when this hook fails.
+HINT = ". If the reply is not on screen, press ctrl+O to see it"
 
 try:
     from check import findings, format_finding, load_rules  # noqa: E402
     from settings import SettingsError, names_for  # noqa: E402
-    from shared import broken_settings, display_folder, emit, file_name, findings_style, hooks_off, parse_event, read_stdin, reason_for, state_folder, truthy  # noqa: E402
+    from shared import broken_settings, display_folder, emit, file_name, findings_style, hide_drafts, hooks_off, parse_event, read_stdin, reason_for, state_folder, truthy  # noqa: E402
     from transcript import tail, turn_text  # noqa: E402
 except Exception as error:
     sys.exit(report("Stop", MISSED, error))
@@ -75,8 +77,8 @@ def reason(found, session):
         return reason_for(OPENING, [EXAMPLE.sub(".", line) for line in lines], rules=False)
     if style == "file":
         # read-findings.py lets Claude read this file without a permission prompt.
-        path = os.path.join(state_folder("findings"), session + ".txt")
         try:
+            path = os.path.join(state_folder("findings"), session + ".txt")
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write(reason_for(OPENING, lines) + "\n")
         except OSError:
@@ -102,8 +104,16 @@ def end_turn(session):
                 pass
 
 
+def sent_back_record(session, create=False):
+    return os.path.join(state_folder("sent-back", create=create), session)
+
+
 def send_back(session, text):
-    with open(os.path.join(state_folder("sent-back"), session), "w"):
+    # Without the record, stop_hook_active alone stops a second send-back of the turn.
+    try:
+        with open(sent_back_record(session, create=True), "w"):
+            pass
+    except OSError:
         pass
     emit({"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": text}})
     return 0
@@ -127,7 +137,11 @@ def main():
     session = file_name(event.get("session_id"))
     last = event.get("last_assistant_message")
     last = last.strip() if isinstance(last, str) else ""
-    if truthy(event.get("stop_hook_active")) and os.path.exists(os.path.join(state_folder("sent-back"), session)):
+    try:
+        sent_back = os.path.exists(sent_back_record(session))
+    except OSError:
+        sent_back = False
+    if truthy(event.get("stop_hook_active")) and sent_back:
         warn_if_hidden(session, last)
         end_turn(session)
         return 0
@@ -151,4 +165,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(run(main, "Stop", MISSED))
+    sys.exit(run(main, "Stop", MISSED + HINT if hide_drafts() else MISSED))

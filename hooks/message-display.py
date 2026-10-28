@@ -56,7 +56,11 @@ def main():
     if not isinstance(delta, str):
         return 0
 
-    folder = display_folder(event.get("session_id"))
+    try:
+        folder = display_folder(event.get("session_id"))
+    except OSError:
+        # Without a safe folder, nothing is hidden: Claude Code shows the original text.
+        return 0
     held = os.path.join(folder, file_name(event.get("message_id")) + ".txt")
 
     if not event.get("final"):

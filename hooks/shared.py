@@ -69,13 +69,23 @@ def display_folder(session_id, create=True):
     return folder
 
 
-def forget_hidden_reply(text):
-    """Deletes the record of a hidden reply for the session in this hook event, so that the
-    display hook checks each reply again. Nothing here may stop the hook's own work."""
+def start_turn(text):
+    """Deletes what the hooks kept from the last turn of the session in this hook event: the
+    record of a hidden reply, so the display hook checks each reply again, and the Stop
+    hook's record that it sent the turn back, which an interrupted turn leaves behind.
+    Nothing here may stop the hook's own work."""
     try:
-        os.remove(os.path.join(display_folder(parse_event(text).get("session_id"), create=False), "hidden"))
-    except (OSError, ValueError):
-        pass
+        session = parse_event(text).get("session_id")
+    except ValueError:
+        return
+    for path in (
+        lambda: os.path.join(display_folder(session, create=False), "hidden"),
+        lambda: os.path.join(state_folder("sent-back", create=False), file_name(session)),
+    ):
+        try:
+            os.remove(path())
+        except OSError:
+            pass
 
 
 def read_stdin(timeout=2.0):
