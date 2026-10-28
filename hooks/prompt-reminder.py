@@ -14,7 +14,7 @@ from failure import report, run  # noqa: E402
 MISSED = "the plain-language reminder was not added to this message"
 
 try:
-    from shared import CORE, emit, hooks_off  # noqa: E402
+    from shared import CORE, emit, forget_hidden_reply, hooks_off, read_stdin  # noqa: E402
 except Exception as error:
     sys.exit(report("UserPromptSubmit", MISSED, error))
 
@@ -22,6 +22,7 @@ except Exception as error:
 def main():
     if hooks_off():
         return 0
+    forget_hidden_reply(read_stdin())
     emit(
         {
             "hookSpecificOutput": {

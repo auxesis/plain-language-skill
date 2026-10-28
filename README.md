@@ -2,7 +2,7 @@
 
 This Claude Code plugin makes Claude write in plain language.
 It follows ISO 24495-1:2023, ISO 24495-3:2026, and the GOV.UK content guidance.
-The plugin contains a skill and five hooks.
+The plugin contains a skill and seven hooks.
 
 ## Example
 
@@ -23,6 +23,8 @@ With the skill, Claude replies:
 - **Every session and subagent:** a hook adds the core rules in `core.md` to the context.
 - **Every message you send:** a hook adds a one-line reminder of those rules.
 - **Every chat reply:** a Stop hook checks the reply. If a rule that must be fixed is broken, the reply goes back to Claude once for a rewrite.
+- **While a reply appears:** a display hook hides a reply that the Stop hook will send back, so you see only the rewrite. See "Settings".
+- **The findings file:** a hook lets Claude read the Stop hook's findings file without asking you.
 - **Every Markdown or text file Claude writes:** a hook checks the new text in the same way.
 - **Documents, rewrites, and reviews:** Claude loads the skill in `SKILL.md`. It has the full process.
 
@@ -31,7 +33,10 @@ With the skill, Claude replies:
 You need Claude Code, git, and Python 3.9 or later.
 The hooks and the checker are written in Python.
 They use only the modules that come with Python, so you do not need to install any packages.
-The plugin has been tested on Linux only, with Claude Code 2.1.307, Python 3.9.25, and Python 3.14.8.
+The plugin has been tested on Linux only, with Claude Code 2.1.307 and 2.1.312, Python 3.9.25, and Python 3.14.8.
+
+The plugin's settings need Claude Code 2.1.271 or later.
+Older versions of Claude Code cannot load the plugin.
 
 1. Check that you have Python 3.9 or later:
 
@@ -77,12 +82,12 @@ To check the install, run this command:
 claude plugin details plain-language
 ```
 
-It lists one skill and five hooks.
+It lists one skill and seven hooks.
 In a session, type `/hooks` to see the hooks, or `/plain-language:plain-language` to load the skill.
 
 ### How the hooks run
 
-The five hook commands are in `hooks/hooks.json`.
+The seven hook commands are in `hooks/hooks.json`.
 Claude Code replaces `${CLAUDE_PLUGIN_ROOT}` in each command with the folder where it installed the plugin.
 
 If Python 3 is not installed, each hook exits without doing anything.
@@ -206,6 +211,77 @@ To turn it on, type `/plugin` in a session, open the **Marketplaces** tab, selec
 
 2. Start a new Claude Code session.
 
+## Settings
+
+The plugin has two settings.
+To change them, type `/config` in a session.
+
+| Setting | Values | Default |
+|---|---|---|
+| `findings` | `file`, `short`, or `full` | `file` |
+| `hide_drafts` | `true` or `false` | `true` |
+
+### What you see when a reply goes back for a rewrite
+
+The `findings` setting controls what the Stop hook's message shows:
+
+- **`file`:** the findings go in a file, and the message asks Claude to read it. You see the message and a line that says "Read 1 file".
+- **`short`:** the message lists each finding with its advice. It leaves out the example at the end of the advice, and the path to `core.md`.
+- **`full`:** the message lists each finding with its advice, an example, and the path to `core.md`.
+
+In a test reply with two findings, `file` took 5 lines on screen. `short` took 10 lines, and `full` took 13.
+The terminal was 100 columns wide.
+
+With `file`, the findings are in the plugin's data folder, `~/.claude/plugins/data/plain-language-plain-language-skill/findings/`.
+Claude Code normally asks you before Claude reads a file outside your project.
+A PreToolUse hook lets Claude read the files in that folder without asking.
+That hook allows no other file.
+The Stop hook deletes the session's findings file at the end of each turn.
+
+### Hidden drafts
+
+With `hide_drafts` on, no reply appears until Claude has finished writing it.
+Then a display hook checks the reply against the same rules as the Stop hook.
+A reply that passes appears in full.
+A reply that breaks a rule that must be fixed does not appear.
+You see the Stop hook's message, then the rewrite.
+
+After the display hook hides a reply, it shows every later reply until you send your next message.
+The Stop hook does not check a rewrite either.
+
+Hidden drafts have these costs:
+
+- No reply appears line by line. Each reply appears only when it is complete.
+- The hidden reply is still in the transcript. Claude also still has it in its context.
+- Verbose mode shows the hidden reply. To turn verbose mode on or off, press ctrl+O.
+- If you stop Claude after a reply is hidden, that reply stays hidden. Verbose mode still shows it.
+
+Turn `hide_drafts` off to see each reply line by line, as Claude writes it.
+
+### Where the settings are saved
+
+Claude Code saves the values in `~/.claude/settings.json`, under `pluginConfigs`:
+
+```json
+{
+  "pluginConfigs": {
+    "plain-language@plain-language-skill": {
+      "options": { "findings": "short", "hide_drafts": false }
+    }
+  }
+}
+```
+
+Claude Code reads `pluginConfigs` only from your user settings and from managed settings.
+A project's settings file cannot change these settings.
+Until you save a value, Claude Code does not pass the setting to the hooks, and the hooks use the defaults in the table.
+
+To try other values for one session, pass them with `--settings`:
+
+```
+claude --settings '{"pluginConfigs": {"plain-language@plain-language-skill": {"options": {"hide_drafts": false}}}}'
+```
+
 ## Skip a check
 
 - **Skip one line:** put `plain-language-allow` on the line. In Markdown, write it in a comment: `<!-- plain-language-allow -->`.
@@ -276,7 +352,7 @@ A broken settings file is never ignored:
 | `skills/plain-language/scripts/rules.json` | The list of rules the checker applies |
 | `skills/plain-language/scripts/settings.py` | The code that finds and reads a project's `.plain-language.json` |
 | `hooks/hooks.json` | The commands that run the hooks |
-| `hooks/*.py` | The four hooks, and the code they share |
+| `hooks/*.py` | The hooks, and the code they share |
 | `tests/` | Tests for the checker, the hooks, and the plugin files |
 | `evals/` | The test prompts used to measure the skill |
 

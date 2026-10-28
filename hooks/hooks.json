@@ -13,6 +13,12 @@
     "Stop": [
       { "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-guard.py\" || exit 1" }] }
     ],
+    "MessageDisplay": [
+      { "hooks": [{ "type": "command", "timeout": 10, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"${CLAUDE_PLUGIN_ROOT}/hooks/message-display.py\" || exit 1" }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Read", "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"${CLAUDE_PLUGIN_ROOT}/hooks/read-findings.py\" || exit 1" }] }
+    ],
     "PostToolUse": [
       { "matcher": "Write|Edit|MultiEdit", "hooks": [{ "type": "command", "timeout": 30, "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 -I \"${CLAUDE_PLUGIN_ROOT}/hooks/file-guard.py\" || exit 1" }] }
     ]
