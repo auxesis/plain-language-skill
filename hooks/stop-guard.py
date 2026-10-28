@@ -13,9 +13,15 @@
 # Input is the Stop hook's JSON on stdin:
 # { session_id, transcript_path, last_assistant_message, stop_hook_active, cwd }.
 # The names in the settings file for cwd, the session's folder, are read as one word.
-# Output is nothing, which lets the turn end, or {"decision":"block","reason":...},
-# which gives the reason back to Claude to act on. When the hook's own code fails, the
-# output is {"systemMessage":...}, a warning for the person (see failure.py).
+# Output is nothing, which lets the turn end, or hookSpecificOutput.additionalContext,
+# which gives the findings back to Claude to act on. That field sends the turn back in
+# the same way as {"decision":"block"}, but Claude Code labels it "Stop hook feedback"
+# on screen instead of "Stop hook error". When the hook's own code fails, the output is
+# {"systemMessage":...}, a warning for the person (see failure.py).
+#
+# When the display hook hid a reply and the reply after it is much shorter, the reply is
+# probably a refusal rather than a rewrite, so the hidden text would never appear. The
+# hook then shows a warning that says how to see it.
 #
 # The hook sends a turn back at most once, because a second time could loop for ever.
 # stop_hook_active is true when a Stop hook from any plugin sent the turn back, so the
@@ -38,7 +44,7 @@ MISSED = "Claude's reply was not checked against the plain-language rules"
 try:
     from check import findings, format_finding, load_rules  # noqa: E402
     from settings import SettingsError, names_for  # noqa: E402
-    from shared import broken_settings, emit, file_name, findings_style, hooks_off, parse_event, read_stdin, reason_for, state_folder, truthy  # noqa: E402
+    from shared import broken_settings, display_folder, emit, file_name, findings_style, hooks_off, parse_event, read_stdin, reason_for, state_folder, truthy  # noqa: E402
     from transcript import tail, turn_text  # noqa: E402
 except Exception as error:
     sys.exit(report("Stop", MISSED, error))
@@ -48,6 +54,7 @@ OPENING = "Your reply breaks the plain-language rules (ISO 24495-1). Write the r
 EXAMPLE = re.compile(r':\s*"[^"]*"\s*$')
 # A session that ends during a turn leaves its files. Files this old are deleted.
 STALE = 24 * 60 * 60
+HIDDEN = "plain-language: a reply that broke the rules is hidden, and the reply after it is much shorter, so it may not be a rewrite. Press ctrl+O to see the hidden reply."
 
 
 def earlier_text(transcript_path):
@@ -95,11 +102,21 @@ def end_turn(session):
                 pass
 
 
-def send_back(session, payload):
+def send_back(session, text):
     with open(os.path.join(state_folder("sent-back"), session), "w"):
         pass
-    emit(payload)
+    emit({"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": text}})
     return 0
+
+
+def warn_if_hidden(session, last):
+    try:
+        with open(os.path.join(display_folder(session, create=False), "hidden"), encoding="utf-8") as handle:
+            hidden = handle.read()
+    except OSError:
+        return
+    if len(last.split()) < len(hidden.split()) / 2:
+        emit({"systemMessage": HIDDEN})
 
 
 def main():
@@ -108,12 +125,13 @@ def main():
 
     event = parse_event(read_stdin())
     session = file_name(event.get("session_id"))
+    last = event.get("last_assistant_message")
+    last = last.strip() if isinstance(last, str) else ""
     if truthy(event.get("stop_hook_active")) and os.path.exists(os.path.join(state_folder("sent-back"), session)):
+        warn_if_hidden(session, last)
         end_turn(session)
         return 0
 
-    last = event.get("last_assistant_message")
-    last = last.strip() if isinstance(last, str) else ""
     earlier = earlier_text(event.get("transcript_path"))
     text = "\n\n".join(part for part in (earlier, last) if part) if last and last not in earlier else earlier
     if not text:
@@ -125,11 +143,11 @@ def main():
         names = names_for(cwd if isinstance(cwd, str) and cwd else os.getcwd())
         found = [one for one in findings(text, load_rules(), mode="chat", names=names) if one["severity"] == "block"]
     except SettingsError as error:
-        return send_back(session, broken_settings(error, "Your reply"))
+        return send_back(session, broken_settings(error, "Your reply")["reason"])
     if not found:
         end_turn(session)
         return 0
-    return send_back(session, {"decision": "block", "reason": reason(found, session)})
+    return send_back(session, reason(found, session))
 
 
 if __name__ == "__main__":

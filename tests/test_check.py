@@ -466,6 +466,11 @@ def run_hook(name, event, cwd=None, env=None):
     return run([os.path.join(ROOT, "hooks", name)], json.dumps(event), cwd=cwd, env=env)
 
 
+def sent_back(result):
+    """The text the Stop hook gave back to Claude, or None when it let the turn end."""
+    return json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"] if result.stdout else None
+
+
 def findings_file(name="session.txt"):
     """A file in the findings folder, where the Stop hook writes findings for Claude to read."""
     folder = os.path.join(os.environ["CLAUDE_PLUGIN_DATA"], "findings")
@@ -529,7 +534,7 @@ class TheHooks(unittest.TestCase):
         transcript = os.path.join(temporary_folder(self), "t.jsonl")
         write(transcript, "\n".join([entry("user", "q"), entry("assistant", [{"type": "text", "text": "It doesn't work."}])]))
         first = run_hook("stop-guard.py", {"transcript_path": transcript, "stop_hook_active": False})
-        self.assertEqual(json.loads(first.stdout)["decision"], "block")
+        self.assertIn("Your reply breaks", sent_back(first))
         second = run_hook("stop-guard.py", {"transcript_path": transcript, "stop_hook_active": True})
         self.assertEqual(second.stdout, "")
 
@@ -537,7 +542,7 @@ class TheHooks(unittest.TestCase):
         transcript = os.path.join(temporary_folder(self), "t.jsonl")
         write(transcript, entry("user", "q"))
         result = run_hook("stop-guard.py", {"transcript_path": transcript, "last_assistant_message": "Under the hood, it doesn't work."})
-        self.assertEqual(json.loads(result.stdout)["decision"], "block")
+        self.assertIn("Your reply breaks", sent_back(result))
         missing = run_hook("stop-guard.py", {"transcript_path": "/nonexistent/t.jsonl", "last_assistant_message": "It does not work."})
         self.assertEqual(missing.stdout, "")
 
@@ -749,9 +754,9 @@ class ProjectNames(unittest.TestCase):
         root = repository(self, {"names": ["aXcelerate"]})
         event = {"transcript_path": "/nonexistent/t.jsonl", "last_assistant_message": CLUSTER, "cwd": root}
         self.assertEqual(run_hook("stop-guard.py", event).stdout, "")
-        self.assertEqual(json.loads(run_hook("stop-guard.py", {**event, "cwd": temporary_folder(self)}).stdout)["decision"], "block")
+        self.assertIn("Your reply breaks", sent_back(run_hook("stop-guard.py", {**event, "cwd": temporary_folder(self)})))
         write(os.path.join(root, ".plain-language.json"), '{"names": [7]}')
-        reason = json.loads(run_hook("stop-guard.py", event).stdout)["reason"]
+        reason = sent_back(run_hook("stop-guard.py", event))
         self.assertIn("Your reply was not checked", reason)
 
 
@@ -1027,7 +1032,7 @@ class TheFindingsSetting(unittest.TestCase):
     def reason(self, env=None, session="session-1"):
         result = run_hook("stop-guard.py", stop_event(REPLY, session=session), env=env)
         self.addCleanup(run_hook, "stop-guard.py", stop_event("It works.", session=session, active=True))
-        return json.loads(result.stdout)["reason"]
+        return sent_back(result)
 
     def test_full_findings_have_the_advice_with_its_example_and_the_path_to_the_rules(self):
         reason = self.reason(with_settings(findings="full"))
@@ -1083,7 +1088,7 @@ class TheFindingsSetting(unittest.TestCase):
     def test_the_stop_hook_checks_a_turn_that_another_plugins_hook_sent_back(self):
         session = "s-other-hook"
         first = run_hook("stop-guard.py", stop_event(REPLY, session=session, active=True))
-        self.assertEqual(json.loads(first.stdout)["decision"], "block")
+        self.assertIn("Your reply breaks", sent_back(first))
         second = run_hook("stop-guard.py", stop_event(REPLY, session=session, active=True))
         self.assertEqual(second.stdout, "")
 
@@ -1095,7 +1100,7 @@ class TheFindingsSetting(unittest.TestCase):
         env["TMPDIR"] = temporary
         base = os.path.join(temporary, f"plain-language-{os.getuid()}")
         safe = run_hook("stop-guard.py", stop_event(REPLY, session="s-fallback"), env=env)
-        self.assertIn(f"Read {base}", json.loads(safe.stdout)["reason"])
+        self.assertIn(f"Read {base}", sent_back(safe))
         os.chmod(base, 0o777)
         unsafe = run_hook("stop-guard.py", stop_event(REPLY, session="s-fallback-2"), env=env)
         self.assertIn("is not a folder that only this user can change", json.loads(unsafe.stdout)["systemMessage"])
@@ -1177,6 +1182,38 @@ class HiddenDrafts(unittest.TestCase):
 
     def test_prints_nothing_for_an_event_without_text(self):
         self.assertEqual(run_hook("message-display.py", {}).stdout, "")
+
+    # Claude Code labels additionalContext "Stop hook feedback" on screen, and shows no
+    # "Stop hook error" notice, while still sending the turn back to Claude.
+    def test_the_stop_hook_sends_a_reply_back_as_feedback_not_as_an_error(self):
+        out = json.loads(run_hook("stop-guard.py", stop_event(REPLY, session="s-label")).stdout)
+        self.addCleanup(run_hook, "stop-guard.py", stop_event(REPLY, session="s-label", active=True))
+        self.assertEqual(list(out), ["hookSpecificOutput"])
+        self.assertEqual(out["hookSpecificOutput"]["hookEventName"], "Stop")
+        self.assertIn("Your reply breaks", out["hookSpecificOutput"]["additionalContext"])
+
+    def test_warns_when_the_reply_after_a_hidden_one_is_much_shorter(self):
+        long_reply = " ".join([REPLY] * 4)
+        cases = {
+            "a short refusal": ("I will not rewrite it.", True),
+            "a rewrite of the same length": (long_reply.replace(" and the tunnel are up.", ". The tunnel must be up too."), False),
+            "a rewrite of just over half the length": (" ".join([REPLY] * 2) + " More.", False),
+        }
+        for name, (after, warned) in cases.items():
+            with self.subTest(name):
+                session = "s-warn-" + name.split()[1]
+                run_hook("message-display.py", display_event(long_reply, session=session))
+                self.assertIn("Your reply breaks", sent_back(run_hook("stop-guard.py", stop_event(long_reply, session=session))))
+                out = run_hook("stop-guard.py", stop_event(after, session=session, active=True)).stdout
+                self.assertEqual("Press ctrl+O to see the hidden reply" in out, warned)
+                if warned:
+                    self.assertEqual(list(json.loads(out)), ["systemMessage"])
+                run_hook("prompt-reminder.py", {"session_id": session})
+
+    def test_does_not_warn_when_no_reply_was_hidden(self):
+        session = "s-no-warn"
+        self.assertIn("Your reply breaks", sent_back(run_hook("stop-guard.py", stop_event(REPLY, session=session))))
+        self.assertEqual(run_hook("stop-guard.py", stop_event("Short.", session=session, active=True)).stdout, "")
 
 
 if __name__ == "__main__":

@@ -22,7 +22,7 @@ With the skill, Claude replies:
 
 - **Every session and subagent:** a hook adds the core rules in `core.md` to the context.
 - **Every message you send:** a hook adds a one-line reminder of those rules.
-- **Every chat reply:** a Stop hook checks the reply. If a rule that must be fixed is broken, the reply goes back to Claude once for a rewrite.
+- **Every chat reply:** a Stop hook checks the reply. If a rule that must be fixed is broken, the reply goes back to Claude once for a rewrite. Claude Code labels the hook's message "Stop hook feedback".
 - **While a reply appears:** a display hook hides a reply that the Stop hook will send back, so you see only the rewrite. See "Settings".
 - **The findings file:** a hook lets Claude read the Stop hook's findings file without asking you.
 - **Every Markdown or text file Claude writes:** a hook checks the new text in the same way.
@@ -248,6 +248,14 @@ You see the Stop hook's message, then the rewrite.
 
 After the display hook hides a reply, it shows every later reply until you send your next message.
 The Stop hook does not check a rewrite either.
+
+Claude sometimes declines to rewrite, for example when you asked for an exact copy of a text.
+Then the hidden reply never appears.
+The Stop hook warns you when the reply after a hidden one has fewer than half as many words:
+
+```text
+plain-language: a reply that broke the rules is hidden, and the reply after it is much shorter, so it may not be a rewrite. Press ctrl+O to see the hidden reply.
+```
 
 Hidden drafts have these costs:
 

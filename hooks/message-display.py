@@ -70,10 +70,11 @@ def main():
             text = handle.read() + delta
         os.remove(held)
 
+    # The hidden text is kept, so the Stop hook can tell a rewrite from a short refusal.
     hidden = os.path.join(folder, "hidden")
     if not os.path.exists(hidden) and breaks_rules(text, event.get("cwd")):
-        with open(hidden, "w"):
-            pass
+        with open(hidden, "w", encoding="utf-8") as handle:
+            handle.write(text)
         return show("")
     return show(text)
 
