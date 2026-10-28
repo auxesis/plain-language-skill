@@ -16,12 +16,30 @@ SKILL = os.path.join(ROOT, "skills", "plain-language")
 sys.path[:0] = [os.path.join(SKILL, "scripts"), os.path.join(ROOT, "hooks")]
 
 import failure  # noqa: E402
+import shared  # noqa: E402
 from check import findings, load_rules  # noqa: E402
 from prose import count_words, prose_units, sentences  # noqa: E402
 from settings import SettingsError, names_for  # noqa: E402
 from transcript import turn_text  # noqa: E402
 
 rules = load_rules()
+
+# Each hook the tests run inherits this environment: a data folder of its own, and no
+# saved settings, so the hooks use the defaults in plugin.json.
+DATA = tempfile.TemporaryDirectory(prefix="plain-language-data-")
+SAVED_ENVIRONMENT = dict(os.environ)
+
+
+def setUpModule():
+    for key in [key for key in os.environ if key.startswith("CLAUDE_PLUGIN_OPTION_")]:
+        del os.environ[key]
+    os.environ["CLAUDE_PLUGIN_DATA"] = DATA.name
+
+
+def tearDownModule():
+    os.environ.clear()
+    os.environ.update(SAVED_ENVIRONMENT)
+    DATA.cleanup()
 
 
 def ids(text, mode="file"):
@@ -448,6 +466,24 @@ def run_hook(name, event, cwd=None, env=None):
     return run([os.path.join(ROOT, "hooks", name)], json.dumps(event), cwd=cwd, env=env)
 
 
+def sent_back(result):
+    """The text the Stop hook gave back to Claude, or None when it let the turn end."""
+    return json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"] if result.stdout else None
+
+
+def findings_file(name="session.txt"):
+    """A file in the findings folder, where the Stop hook writes findings for Claude to read."""
+    folder = os.path.join(os.environ["CLAUDE_PLUGIN_DATA"], "findings")
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, name)
+    write(path, "findings\n")
+    return path
+
+
+def display_event(delta, final=True, turn="turn-1", message="message-1", session="session-1"):
+    return {"session_id": session, "turn_id": turn, "message_id": message, "final": final, "delta": delta}
+
+
 class TheHooks(unittest.TestCase):
     def test_reads_every_text_block_claude_wrote_since_the_persons_last_message(self):
         transcript = "\n".join(
@@ -498,7 +534,7 @@ class TheHooks(unittest.TestCase):
         transcript = os.path.join(temporary_folder(self), "t.jsonl")
         write(transcript, "\n".join([entry("user", "q"), entry("assistant", [{"type": "text", "text": "It doesn't work."}])]))
         first = run_hook("stop-guard.py", {"transcript_path": transcript, "stop_hook_active": False})
-        self.assertEqual(json.loads(first.stdout)["decision"], "block")
+        self.assertIn("Your reply breaks", sent_back(first))
         second = run_hook("stop-guard.py", {"transcript_path": transcript, "stop_hook_active": True})
         self.assertEqual(second.stdout, "")
 
@@ -506,7 +542,7 @@ class TheHooks(unittest.TestCase):
         transcript = os.path.join(temporary_folder(self), "t.jsonl")
         write(transcript, entry("user", "q"))
         result = run_hook("stop-guard.py", {"transcript_path": transcript, "last_assistant_message": "Under the hood, it doesn't work."})
-        self.assertEqual(json.loads(result.stdout)["decision"], "block")
+        self.assertIn("Your reply breaks", sent_back(result))
         missing = run_hook("stop-guard.py", {"transcript_path": "/nonexistent/t.jsonl", "last_assistant_message": "It does not work."})
         self.assertEqual(missing.stdout, "")
 
@@ -548,7 +584,7 @@ class TheHooks(unittest.TestCase):
     # so a file there named like one of the hook's modules must not be imported.
     def test_every_hook_ignores_python_files_and_variables_in_the_project_folder(self):
         folder = temporary_folder(self)
-        for name in ("json", "re", "check", "prose", "settings", "shared", "transcript"):
+        for name in ("json", "re", "shutil", "stat", "tempfile", "time", "check", "prose", "settings", "shared", "transcript"):
             write(os.path.join(folder, f"{name}.py"), "raise SystemExit('imported from the project folder')\n")
         env = {**os.environ, "PYTHONPATH": folder}
         file = os.path.join(folder, "doc.md")
@@ -560,6 +596,8 @@ class TheHooks(unittest.TestCase):
             "prompt-reminder.py": {},
             "stop-guard.py": {"transcript_path": transcript},
             "file-guard.py": {"tool_name": "Write", "tool_input": {"file_path": file}},
+            "message-display.py": display_event("It works."),
+            "read-findings.py": {"tool_name": "Read", "tool_input": {"file_path": findings_file()}},
         }
         for name, event in events.items():
             with self.subTest(hook=name):
@@ -716,9 +754,9 @@ class ProjectNames(unittest.TestCase):
         root = repository(self, {"names": ["aXcelerate"]})
         event = {"transcript_path": "/nonexistent/t.jsonl", "last_assistant_message": CLUSTER, "cwd": root}
         self.assertEqual(run_hook("stop-guard.py", event).stdout, "")
-        self.assertEqual(json.loads(run_hook("stop-guard.py", {**event, "cwd": temporary_folder(self)}).stdout)["decision"], "block")
+        self.assertIn("Your reply breaks", sent_back(run_hook("stop-guard.py", {**event, "cwd": temporary_folder(self)})))
         write(os.path.join(root, ".plain-language.json"), '{"names": [7]}')
-        reason = json.loads(run_hook("stop-guard.py", event).stdout)["reason"]
+        reason = sent_back(run_hook("stop-guard.py", event))
         self.assertIn("Your reply was not checked", reason)
 
 
@@ -752,6 +790,8 @@ class TheSwitchThatTurnsOffTheHooks(unittest.TestCase):
             "prompt-reminder.py": {},
             "stop-guard.py": {"last_assistant_message": "We did it in order to test it."},
             "file-guard.py": {"tool_name": "Write", "tool_input": {"file_path": file}},
+            "message-display.py": display_event("It works."),
+            "read-findings.py": {"tool_name": "Read", "tool_input": {"file_path": findings_file()}},
         }
 
     def test_every_hook_exits_with_0_and_prints_nothing_when_the_variable_is_false(self):
@@ -809,16 +849,26 @@ def run_command(test, command, plugin_root):
 
 
 class ThePlugin(unittest.TestCase):
-    def test_hooks_json_has_one_command_for_each_of_the_five_events(self):
+    def test_hooks_json_has_one_command_for_each_of_the_seven_events(self):
         hooks = plugin_hooks()
         self.assertEqual(
             [(event, matcher) for event, matcher, _ in hooks],
-            [("SessionStart", None), ("SubagentStart", None), ("UserPromptSubmit", None), ("Stop", None), ("PostToolUse", "Write|Edit|MultiEdit")],
+            [
+                ("SessionStart", None),
+                ("SubagentStart", None),
+                ("UserPromptSubmit", None),
+                ("Stop", None),
+                ("MessageDisplay", None),
+                ("PreToolUse", "Read"),
+                ("PostToolUse", "Write|Edit|MultiEdit"),
+            ],
         )
         for event, _, hook in hooks:
             with self.subTest(event=event):
                 self.assertEqual(hook["type"], "command")
-                self.assertEqual(hook["timeout"], 30)
+                # Claude Code holds each batch of a reply until the MessageDisplay hook
+                # returns, so that hook keeps the event's default timeout of 10 seconds.
+                self.assertEqual(hook["timeout"], 10 if event == "MessageDisplay" else 30)
 
     def test_each_hook_command_runs_a_file_that_exists_and_has_the_guard_and_exit_1_at_the_end(self):
         for event, _, hook in plugin_hooks():
@@ -882,6 +932,8 @@ FAILING_HOOKS = [
     ("prompt-reminder.py", "shared.py", RAISES_IN_EMIT, "UserPromptSubmit", "the plain-language reminder was not added to this message"),
     ("stop-guard.py", "check.py", RAISES_IN_FINDINGS, "Stop", "Claude's reply was not checked"),
     ("file-guard.py", "check.py", RAISES_IN_FINDINGS, "PostToolUse", "the prose Claude just wrote to doc.md was not checked"),
+    ("message-display.py", "shared.py", RAISES_IN_EMIT, "MessageDisplay", "Claude's reply was shown without the plain-language check"),
+    ("read-findings.py", "shared.py", RAISES_IN_EMIT, "PreToolUse", "Claude may need your permission to read the plain-language findings"),
 ]
 
 
@@ -894,6 +946,8 @@ class WhenAHookFails(unittest.TestCase):
             "prompt-reminder.py": {},
             "stop-guard.py": {"last_assistant_message": PROSE},
             "file-guard.py": {"tool_name": "Write", "tool_input": {"file_path": file}},
+            "message-display.py": display_event(PROSE),
+            "read-findings.py": {"tool_name": "Read", "tool_input": {"file_path": findings_file()}},
         }[hook]
 
     def run_copy(self, copy, hook, env=None):
@@ -948,6 +1002,293 @@ class WhenAHookFails(unittest.TestCase):
                     self.assertRegex(json.loads(result.stdout)["systemMessage"], "python3 was not found")
                 else:
                     self.assertEqual(result.stdout, "")
+
+
+REPLY = "The server is up only while your machine and the tunnel are up."
+
+
+def stop_event(text, session="session-1", active=False):
+    return {"session_id": session, "last_assistant_message": text, "stop_hook_active": active}
+
+
+def with_settings(**values):
+    """The environment with these saved settings, the way Claude Code passes them to a hook."""
+    return {**os.environ, **{f"CLAUDE_PLUGIN_OPTION_{key.upper()}": value for key, value in values.items()}}
+
+
+def data_path(*parts):
+    return os.path.join(os.environ["CLAUDE_PLUGIN_DATA"], *parts)
+
+
+class TheFindingsSetting(unittest.TestCase):
+    def test_the_manifest_declares_both_settings_with_the_defaults_the_hooks_use(self):
+        options = read_json(".claude-plugin", "plugin.json")["userConfig"]
+        self.assertEqual(sorted(options), ["findings", "hide_drafts"])
+        self.assertEqual(options["findings"]["options"], list(shared.FINDINGS_STYLES))
+        self.assertEqual(options["findings"]["default"], shared.DEFAULT_FINDINGS)
+        self.assertEqual(options["hide_drafts"]["type"], "boolean")
+        self.assertEqual(options["hide_drafts"]["default"], shared.DEFAULT_HIDE_DRAFTS)
+
+    def reason(self, env=None, session="session-1"):
+        result = run_hook("stop-guard.py", stop_event(REPLY, session=session), env=env)
+        self.addCleanup(run_hook, "stop-guard.py", stop_event("It works.", session=session, active=True))
+        return sent_back(result)
+
+    def test_full_findings_have_the_advice_with_its_example_and_the_path_to_the_rules(self):
+        reason = self.reason(with_settings(findings="full"))
+        self.assertIn(REPLY, reason)
+        self.assertIn('Write two sentences: "Six decisions are made. Eight are waiting for you."', reason)
+        self.assertIn("The rules and the reasons for them:", reason)
+
+    def test_short_findings_leave_out_the_example_and_the_path_to_the_rules(self):
+        reason = self.reason(with_settings(findings="short"))
+        self.assertIn(REPLY, reason)
+        self.assertIn("Write two sentences.", reason)
+        self.assertNotIn("Six decisions", reason)
+        self.assertNotIn("The rules and the reasons for them:", reason)
+
+    def test_file_findings_are_the_default_and_ask_claude_to_read_the_full_findings(self):
+        for name, env in (("unset", None), ("FILE", with_settings(findings="FILE")), ("unknown", with_settings(findings="long"))):
+            with self.subTest(setting=name):
+                session = f"s-file-{name}"
+                reason = self.reason(env, session=session)
+                path = data_path("findings", f"{session}.txt")
+                self.assertEqual(reason, f"Your reply breaks the plain-language rules (ISO 24495-1). Read {path} for the sentences to fix. Then write the corrected reply as if it were the first.")
+                with open(path, encoding="utf-8") as handle:
+                    written = handle.read()
+                self.assertIn(REPLY, written)
+                self.assertIn("The rules and the reasons for them:", written)
+
+    # The screen can show a rewrite after the Stop hook has run, so the display hook's
+    # record of a hidden reply stays until the person's next message.
+    def test_the_end_of_the_turn_deletes_the_sessions_findings_and_keeps_its_display_files(self):
+        session = "s-end"
+        self.reason(session=session)
+        run_hook("message-display.py", display_event(REPLY, session=session))
+        paths = [data_path("findings", f"{session}.txt"), data_path("sent-back", session)]
+        hidden = data_path("display", session, "hidden")
+        for path in [*paths, hidden]:
+            self.assertTrue(os.path.exists(path), path)
+        self.assertEqual(run_hook("stop-guard.py", stop_event(REPLY, session=session, active=True)).stdout, "")
+        for path in paths:
+            self.assertFalse(os.path.exists(path), path)
+        self.assertTrue(os.path.exists(hidden))
+        run_hook("prompt-reminder.py", {"session_id": session})
+        self.assertFalse(os.path.exists(hidden))
+
+    def test_the_end_of_any_turn_deletes_files_older_than_a_day(self):
+        old, new = findings_file("s-old.txt"), findings_file("s-new.txt")
+        self.addCleanup(os.remove, new)
+        record = data_path("sent-back", "s-old")
+        os.makedirs(os.path.dirname(record), exist_ok=True)
+        write(record, "")
+        folder = data_path("display", "s-old")
+        os.makedirs(folder, exist_ok=True)
+        write(os.path.join(folder, "hidden"), "old\n")
+        for path in (old, record, folder):
+            os.utime(path, (0, 0))
+        self.assertEqual(run_hook("stop-guard.py", stop_event("It works.", session="s-other")).stdout, "")
+        for path in (old, record, folder):
+            self.assertFalse(os.path.exists(path), path)
+        self.assertTrue(os.path.exists(new))
+
+    # The person can press Esc while Claude writes the rewrite. Then the Stop hook does not
+    # run, and its record that it sent the turn back stays.
+    def test_a_new_message_deletes_the_record_of_a_turn_that_was_interrupted(self):
+        session = "s-interrupted"
+        self.assertIn("Your reply breaks", sent_back(run_hook("stop-guard.py", stop_event(REPLY, session=session))))
+        self.assertTrue(os.path.exists(data_path("sent-back", session)))
+        run_hook("prompt-reminder.py", {"session_id": session})
+        self.assertFalse(os.path.exists(data_path("sent-back", session)))
+        self.assertIn("Your reply breaks", sent_back(run_hook("stop-guard.py", stop_event(REPLY, session=session, active=True))))
+        self.addCleanup(run_hook, "stop-guard.py", stop_event("It works.", session=session, active=True))
+
+    def test_file_findings_fall_back_to_the_full_findings_when_the_file_cannot_be_written(self):
+        session = "s-no-file"
+        path = data_path("findings", f"{session}.txt")
+        os.makedirs(path)
+        self.addCleanup(shutil.rmtree, path, ignore_errors=True)
+        reason = self.reason(session=session)
+        self.assertIn(REPLY, reason)
+        self.assertIn("The rules and the reasons for them:", reason)
+        self.assertNotIn("Read ", reason)
+
+    # stop_hook_active is true when a Stop hook from any plugin sent the turn back.
+    def test_the_stop_hook_checks_a_turn_that_another_plugins_hook_sent_back(self):
+        session = "s-other-hook"
+        first = run_hook("stop-guard.py", stop_event(REPLY, session=session, active=True))
+        self.assertIn("Your reply breaks", sent_back(first))
+        second = run_hook("stop-guard.py", stop_event(REPLY, session=session, active=True))
+        self.assertEqual(second.stdout, "")
+
+    def test_the_fallback_folder_must_belong_to_the_user_and_be_closed_to_others(self):
+        if not hasattr(os, "getuid"):
+            self.skipTest("this system has no user IDs")
+        temporary = temporary_folder(self)
+        env = {key: value for key, value in os.environ.items() if key != "CLAUDE_PLUGIN_DATA"}
+        env["TMPDIR"] = temporary
+        base = os.path.join(temporary, f"plain-language-{os.getuid()}")
+        safe = run_hook("stop-guard.py", stop_event(REPLY, session="s-fallback"), env=env)
+        self.assertIn(f"Read {base}", sent_back(safe))
+        os.chmod(base, 0o777)
+        self.check_unsafe_fallback(env, base, "s-fallback-2")
+
+    # On Linux, a link's own mode lets anyone write, so the mode check also rejects it. The
+    # S_ISLNK check matters on systems where a link can have another mode.
+    def test_the_fallback_folder_must_not_be_a_link(self):
+        if not hasattr(os, "getuid"):
+            self.skipTest("this system has no user IDs")
+        temporary = temporary_folder(self)
+        env = {key: value for key, value in os.environ.items() if key != "CLAUDE_PLUGIN_DATA"}
+        env["TMPDIR"] = temporary
+        target = os.path.join(temporary_folder(self), "theirs")
+        os.makedirs(target)
+        os.symlink(target, os.path.join(temporary, f"plain-language-{os.getuid()}"))
+        self.check_unsafe_fallback(env, target, "s-link")
+
+    def check_unsafe_fallback(self, env, folder, session):
+        """With an unsafe fallback folder, no hook touches it. The Stop hook gives the full
+        findings instead of a file, and the other hooks do nothing."""
+        before = sorted(os.path.join(root, name) for root, _, files in os.walk(folder) for name in files)
+        reply = sent_back(run_hook("stop-guard.py", stop_event(REPLY, session=session), env=env))
+        self.assertIn(REPLY, reply)
+        self.assertNotIn("Read ", reply)
+        self.assertEqual(run_hook("stop-guard.py", stop_event("It works.", session=session, active=True), env=env).stdout, "")
+        self.assertEqual(run_hook("message-display.py", display_event(REPLY, session=session), env=env).stdout, "")
+        self.assertEqual(run_hook("read-findings.py", {"tool_name": "Read", "tool_input": {"file_path": findings_file()}}, env=env).stdout, "")
+        after = sorted(os.path.join(root, name) for root, _, files in os.walk(folder) for name in files)
+        self.assertEqual(after, before)
+
+
+class TheReadHook(unittest.TestCase):
+    def output(self, path, tool="Read"):
+        return run_hook("read-findings.py", {"tool_name": tool, "tool_input": {"file_path": path}}).stdout
+
+    def test_lets_claude_read_a_findings_file_without_a_prompt(self):
+        out = json.loads(self.output(findings_file("s-read.txt")))["hookSpecificOutput"]
+        self.assertEqual((out["hookEventName"], out["permissionDecision"]), ("PreToolUse", "allow"))
+
+    def test_leaves_every_other_file_to_claude_codes_own_permission_rules(self):
+        folder = os.path.dirname(findings_file("s-read.txt"))
+        outside = os.path.join(temporary_folder(self), "other.txt")
+        write(outside, "secret\n")
+        link = os.path.join(folder, "link.txt")
+        os.symlink(outside, link)
+        self.addCleanup(os.remove, link)
+        inner = os.path.join(folder, "inner")
+        os.makedirs(inner)
+        self.addCleanup(shutil.rmtree, inner)
+        write(os.path.join(inner, "x.txt"), "x\n")
+        cases = {
+            "a file outside the folder": outside,
+            "a path that leaves the folder through ..": os.path.join(folder, *[".."] * folder.count(os.sep), os.path.relpath(outside, os.sep)),
+            "a link to a file outside the folder": link,
+            "a file in a folder inside it": os.path.join(inner, "x.txt"),
+            "a file that does not exist": os.path.join(folder, "missing.txt"),
+            "the folder itself": folder,
+        }
+        for name, path in cases.items():
+            with self.subTest(name):
+                self.assertEqual(self.output(path), "")
+        self.assertEqual(self.output(findings_file("s-read.txt"), tool="Write"), "")
+
+
+class HiddenDrafts(unittest.TestCase):
+    def shown(self, delta, env=None, **event):
+        """The text the hook shows in place of `delta`, or None when it prints nothing."""
+        result = run_hook("message-display.py", display_event(delta, **event), env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)["hookSpecificOutput"]["displayContent"] if result.stdout else None
+
+    def test_hides_each_batch_and_shows_the_whole_reply_with_the_last(self):
+        session = "s-batches"
+        self.assertEqual(self.shown("It works.\n", final=False, session=session), "")
+        self.assertEqual(self.shown("It runs.\n", final=False, session=session), "")
+        self.assertEqual(self.shown("", session=session), "It works.\nIt runs.\n")
+
+    def test_checks_the_joined_batches_not_only_the_last_one(self):
+        session = "s-joined"
+        first, second = "The server is up only while your machine\n", "and the tunnel are up."
+        self.assertEqual(blocking(first, mode="chat"), [])
+        self.assertEqual(blocking(second, mode="chat"), [])
+        self.assertEqual(self.shown(first, final=False, session=session), "")
+        self.assertEqual(self.shown(second, session=session), "")
+        with open(data_path("display", session, "hidden"), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), first + second)
+
+    def test_hides_a_reply_that_breaks_a_rule_and_shows_every_later_reply_until_the_next_message(self):
+        session = "s-rewrite"
+        self.assertEqual(self.shown(REPLY, session=session, message="draft"), "")
+        self.assertEqual(self.shown(REPLY, session=session, message="rewrite"), REPLY)
+        self.assertEqual(self.shown(REPLY, session=session, turn="turn-2", message="after-a-tool"), REPLY)
+        run_hook("prompt-reminder.py", {"session_id": session})
+        self.assertEqual(self.shown(REPLY, session=session, turn="turn-3", message="next"), "")
+
+    def test_the_prompt_hook_adds_its_reminder_whatever_its_input(self):
+        for text in ("", "not json", "[]", '{"session_id": "s-none"}'):
+            with self.subTest(text=text):
+                result = run([os.path.join(ROOT, "hooks", "prompt-reminder.py")], text)
+                self.assertEqual(json.loads(result.stdout)["hookSpecificOutput"]["hookEventName"], "UserPromptSubmit")
+
+    def test_prints_nothing_when_the_setting_is_off(self):
+        for value in ("false", "FALSE", "0", "off", "no"):
+            with self.subTest(value=value):
+                self.assertIsNone(self.shown(REPLY, env=with_settings(hide_drafts=value), session="s-off"))
+        for value in ("true", "1"):
+            with self.subTest(value=value):
+                self.assertEqual(self.shown("It works.", env=with_settings(hide_drafts=value), session="s-on"), "It works.")
+
+    def test_shows_the_whole_reply_when_the_check_fails(self):
+        hook = os.path.join(broken_copy(self, "check.py", RAISES_IN_FINDINGS), "hooks", "message-display.py")
+        run([hook], json.dumps(display_event(PROSE + "\n", final=False, session="s-broken")))
+        out = json.loads(run([hook], json.dumps(display_event("It runs.", session="s-broken"))).stdout)
+        self.assertEqual(out["hookSpecificOutput"]["displayContent"], PROSE + "\nIt runs.")
+
+    def test_prints_nothing_for_an_event_without_text(self):
+        self.assertEqual(run_hook("message-display.py", {}).stdout, "")
+
+    # Claude Code labels additionalContext "Stop hook feedback" on screen, and shows no
+    # "Stop hook error" notice, while still sending the turn back to Claude.
+    def test_the_stop_hook_sends_a_reply_back_as_feedback_not_as_an_error(self):
+        out = json.loads(run_hook("stop-guard.py", stop_event(REPLY, session="s-label")).stdout)
+        self.addCleanup(run_hook, "stop-guard.py", stop_event(REPLY, session="s-label", active=True))
+        self.assertEqual(list(out), ["hookSpecificOutput"])
+        self.assertEqual(out["hookSpecificOutput"]["hookEventName"], "Stop")
+        self.assertIn("Your reply breaks", out["hookSpecificOutput"]["additionalContext"])
+
+    def test_warns_when_the_reply_after_a_hidden_one_is_much_shorter(self):
+        long_reply = " ".join([REPLY] * 4)
+        cases = {
+            "a short refusal": ("I will not rewrite it.", True),
+            "a rewrite of the same length": (long_reply.replace(" and the tunnel are up.", ". The tunnel must be up too."), False),
+            "a rewrite of just over half the length": (" ".join([REPLY] * 2) + " More.", False),
+            "a rewrite of exactly half the length": (" ".join([REPLY] * 2), False),
+        }
+        for name, (after, warned) in cases.items():
+            with self.subTest(name):
+                session = "s-warn-" + name.split()[1]
+                run_hook("message-display.py", display_event(long_reply, session=session))
+                self.assertIn("Your reply breaks", sent_back(run_hook("stop-guard.py", stop_event(long_reply, session=session))))
+                out = run_hook("stop-guard.py", stop_event(after, session=session, active=True)).stdout
+                self.assertEqual("Press ctrl+O to see the hidden reply" in out, warned)
+                if warned:
+                    self.assertEqual(list(json.loads(out)), ["systemMessage"])
+                run_hook("prompt-reminder.py", {"session_id": session})
+
+    # When the Stop hook fails, a hidden reply stays hidden, so its warning says how to see it.
+    def test_the_stop_hooks_failure_warning_says_how_to_see_a_hidden_reply(self):
+        copy = broken_copy(self, "check.py", RAISES_IN_FINDINGS)
+        for value, hinted in (("true", True), ("false", False)):
+            with self.subTest(hide_drafts=value):
+                result = run([os.path.join(copy, "hooks", "stop-guard.py")], json.dumps(stop_event(REPLY)), env=with_settings(hide_drafts=value))
+                message = json.loads(result.stdout)["systemMessage"]
+                self.assertIn("Claude's reply was not checked", message)
+                self.assertEqual("press ctrl+O to see it" in message, hinted)
+
+    def test_does_not_warn_when_no_reply_was_hidden(self):
+        session = "s-no-warn"
+        self.assertIn("Your reply breaks", sent_back(run_hook("stop-guard.py", stop_event(REPLY, session=session))))
+        self.assertEqual(run_hook("stop-guard.py", stop_event("Short.", session=session, active=True)).stdout, "")
 
 
 if __name__ == "__main__":

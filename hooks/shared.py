@@ -2,7 +2,9 @@
 import json
 import os
 import select
+import stat
 import sys
+import tempfile
 import time
 
 from failure import hooks_off  # noqa: F401  (the hooks import it from here)
@@ -11,6 +13,79 @@ from failure import hooks_off  # noqa: F401  (the hooks import it from here)
 # come from this file's own location, so they are right wherever the plugin is installed.
 SKILL = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "skills", "plain-language")
 CORE = os.path.join(SKILL, "core.md")
+
+# The settings in .claude-plugin/plugin.json, and their defaults there. Claude Code passes
+# a setting to a hook only after the person saves a value, so the hooks need the defaults.
+FINDINGS_STYLES = ("file", "short", "full")
+DEFAULT_FINDINGS = "file"
+DEFAULT_HIDE_DRAFTS = True
+
+
+def setting(key):
+    """The saved value of a setting, or "" when the person has not saved one."""
+    return os.environ.get(f"CLAUDE_PLUGIN_OPTION_{key.upper()}", "").strip().lower()
+
+
+def findings_style():
+    style = setting("findings")
+    return style if style in FINDINGS_STYLES else DEFAULT_FINDINGS
+
+
+def hide_drafts():
+    value = setting("hide_drafts")
+    return DEFAULT_HIDE_DRAFTS if not value else value not in ("false", "0", "no", "off")
+
+
+def state_folder(name, create=True):
+    """A folder for files the hooks keep between calls. Claude Code gives each plugin a data
+    folder in CLAUDE_PLUGIN_DATA. The fallback is in the shared temporary folder."""
+    base = os.environ.get("CLAUDE_PLUGIN_DATA")
+    if not base:
+        user = os.getuid() if hasattr(os, "getuid") else os.environ.get("USERNAME", "user")
+        base = os.path.join(tempfile.gettempdir(), f"plain-language-{user}")
+        # Another user could make this folder first, then change the findings that Claude
+        # reads without a permission prompt.
+        os.makedirs(base, mode=0o700, exist_ok=True)
+        info = os.lstat(base)
+        if hasattr(os, "getuid") and (info.st_uid != os.getuid() or stat.S_ISLNK(info.st_mode) or info.st_mode & 0o022):
+            raise OSError(f"{base} is not a folder that only this user can change")
+    folder = os.path.join(base, name)
+    if create:
+        os.makedirs(folder, mode=0o700, exist_ok=True)
+    return folder
+
+
+def file_name(value):
+    """`value`, such as a session ID, with only the characters that are safe in a file name."""
+    return "".join(c for c in str(value) if c.isalnum() or c in "-_") or "none"
+
+
+def display_folder(session_id, create=True):
+    """The folder where message-display.py keeps a session's batches, and its record of a
+    hidden reply in the file "hidden"."""
+    folder = os.path.join(state_folder("display", create=create), file_name(session_id))
+    if create:
+        os.makedirs(folder, mode=0o700, exist_ok=True)
+    return folder
+
+
+def start_turn(text):
+    """Deletes what the hooks kept from the last turn of the session in this hook event: the
+    record of a hidden reply, so the display hook checks each reply again, and the Stop
+    hook's record that it sent the turn back, which an interrupted turn leaves behind.
+    Nothing here may stop the hook's own work."""
+    try:
+        session = parse_event(text).get("session_id")
+    except ValueError:
+        return
+    for path in (
+        lambda: os.path.join(display_folder(session, create=False), "hidden"),
+        lambda: os.path.join(state_folder("sent-back", create=False), file_name(session)),
+    ):
+        try:
+            os.remove(path())
+        except OSError:
+            pass
 
 
 def read_stdin(timeout=2.0):
@@ -84,7 +159,7 @@ def broken_settings(error, what):
 SHOWN = 12
 
 
-def reason_for(opening, lines):
+def reason_for(opening, lines, rules=True):
     shown = lines[:SHOWN]
     more = len(lines) - len(shown)
     parts = [
@@ -92,7 +167,7 @@ def reason_for(opening, lines):
         "",
         *[part for line in shown for part in (line, "")],
         f"There are {more} more findings like these. Fix them too." if more > 0 else "",
-        f"The rules and the reasons for them: {CORE}.",
+        f"The rules and the reasons for them: {CORE}." if rules else "",
     ]
     kept = [line for i, line in enumerate(parts) if not (line == "" and i > 0 and parts[i - 1] == "")]
     return "\n".join(kept).strip()

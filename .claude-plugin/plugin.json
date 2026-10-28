@@ -6,5 +6,20 @@
   },
   "repository": "https://github.com/auxesis/plain-language-skill",
   "license": "Apache-2.0",
-  "keywords": ["plain-language", "writing", "iso-24495", "gov-uk"]
+  "keywords": ["plain-language", "writing", "iso-24495", "gov-uk"],
+  "userConfig": {
+    "findings": {
+      "type": "string",
+      "title": "Findings on screen",
+      "description": "What the screen shows when Claude must write a reply again. With file, you see one short message, and Claude reads the findings from a file. With short, you see each finding with its advice. With full, you also see an example and the path to the rules.",
+      "options": ["file", "short", "full"],
+      "default": "file"
+    },
+    "hide_drafts": {
+      "type": "boolean",
+      "title": "Hide replies that break the rules",
+      "description": "Hide a reply that Claude must write again. Each reply then appears only when it is complete. Turn this off to see each reply line by line, as Claude writes it.",
+      "default": true
+    }
+  }
 }
